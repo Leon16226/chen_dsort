@@ -1,0 +1,38 @@
+import abc
+from deepsort.utils import compute_color_for_id, plot_one_box
+
+
+class Strategy(metaclass=abc.ABCMeta):
+    def __init__(self, boxes, pool, opt, im0s, threshold, lock):
+        self.boxes = boxes
+        self.pool = pool
+        self.opt = opt
+        self.im0s = im0s
+        self.pbox = []
+        self.threshold = threshold
+        self.lock = lock
+
+        # names
+        names = opt.name
+        with open(names, 'r') as f:
+            names = f.read().split('\n')
+        self.labels = list(filter(None, names))
+
+    @abc.abstractmethod
+    def do(in_area_box):
+        pass
+
+    # 画标签
+    def draw(self):
+        # draw boxes for visualization----------------------------------------------------------------------
+        for i, box in enumerate(self.pbox):
+            bboxes = box[0:4]
+            id = box[4]
+            cls = box[5]
+            c = int(cls)
+            # conf = box[6]
+
+            # label = f'{id} {self.labels[c]}{conf:.2f}'
+            label = f'{id} {self.labels[c]}'
+            color = compute_color_for_id(id)
+            plot_one_box(bboxes, self.im0s, label=label, color=color, line_thickness=2)

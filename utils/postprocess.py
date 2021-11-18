@@ -13,7 +13,9 @@ def postprocess_track(outputs,
                       point2,
                       point3,
                       crows,
-                      p_crowed_time):
+                      p_crowed_time,
+                      crowed_block,
+                      car_num):
 
     # 硬路肩异常停车区域 蓝色
     # point_s = point2.reshape((-1, 1, 2))
@@ -76,32 +78,40 @@ def postprocess_track(outputs,
     illdris = np.array(illdris)
     crowed = np.array(crowed)
 
-    # 计算空间占有率
-    all_area = poly_area(point3)
-    boxs_area = 0
-    t_pass = False
-    for i, box in enumerate(crows):
-        points = [box[0], box[1], box[2], box[1],
-                  box[2], box[3], box[0], box[3]]
-        points = np.array(points).reshape([4, 2])
-        # 要计算相交面积
-        boxs_area += Cal_area_2poly(points, point3)
-        # 小框位置是否有车辆经过
-        p = np.array([(box[2] + box[0]) / 2, (box[3] + box[1]) / 2])
-        if intersects(p, p_crowed_time) and not t_pass:
-            t_pass = True
+    if not crowed_block[0]:
+        # 计算空间占有率
+        all_area = poly_area(point3)
+        boxs_area = 0
+        t_pass = False
+        for i, box in enumerate(crows):
+            # 要计算相交面积
+            points = [box[0], box[1], box[2], box[1],
+                    box[2], box[3], box[0], box[3]]
+            points = np.array(points).reshape([4, 2])
+            boxs_area += Cal_area_2poly(points, point3)
+            # 小框位置是否有车辆经过
+            p = np.array([(box[2] + box[0]) / 2, (box[3] + box[1]) / 2])
+            if intersects(p, p_crowed_time) and not t_pass:
+                t_pass = True
 
-    space_rate = boxs_area / all_area
-    space_rate = space_rate if space_rate < 1 else 0.95
-    print("@@@@@@@@@@@@@@@@@@@ 空间占有率 @@@@@@@@@@@@@@@@@@@@@：", space_rate)
+        space_rate = 1.0 * boxs_area / all_area
+        space_rate = space_rate if space_rate > 0.10 else 0.10
+        space_rate = space_rate if space_rate < 1 else 0.95
+        print("^^^^^^^^^^^^^^^^^ 空间占有率 ^^^^^^^^^^^^^^^^^^：", space_rate)
 
-    # 计算车辆跟踪率
-    car_o_n = crows.shape[0] if crows.size > 0 else 0
-    car_t_n = crowed.shape[0] if crowed.size > 0 else 0
-    car_track_rate = 1.0 * car_t_n / car_o_n if (car_o_n != 0) and (car_t_n != 0) else 0.1
-    print("^^^^^^^^^^^^^^^^^^ 车辆跟踪率 ^^^^^^^^^^^^^^^^^^:", car_track_rate)
+        # 计算车辆跟踪率
+        if car_num > 4:
+            car_o_n = car_num
+            car_t_n = vehicles.shape[0] if vehicles.size > 0 else 0
+            car_track_rate = 1.0 * car_t_n / car_o_n if (car_o_n != 0) and (car_t_n != 0) else 0.10
+            car_track_rate = car_track_rate if car_track_rate < 0.95 else 0.95
+        else:
+            car_track_rate = 0.10
+        print("^^^^^^^^^^^^^^^^^^ 车辆跟踪率 ^^^^^^^^^^^^^^^^^^:", car_track_rate)
 
-    crowed = [crowed, space_rate, t_pass, car_track_rate]
+        crowed = [crowed, space_rate, t_pass, car_track_rate, crowed_block]
+    else:
+        print("^^^^^^^^^^^^^^^^^^ 拥堵检测锁定状态 ^^^^^^^^^^^^^^^^^^")
 
     c_box = {
              0: vehicles,

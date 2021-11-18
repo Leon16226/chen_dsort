@@ -2,10 +2,12 @@ import cv2
 import numpy as np
 import threading
 import time
+from threading import Thread
 from deepsort.utils import iou, calc_iou, compute_color_for_id
 from net.push import push
 from .base_strategy import Strategy
 from utils.shape import poly_area
+from utils.norm import start_block
 
 
 # 0.异常停车---------------------------------------------------------------------------------------------------------------
@@ -217,6 +219,7 @@ class crowedSrtategy(Strategy):
         space_rate = self.boxes[1]
         t_pass = self.boxes[2]
         car_track_rate = self.boxes[3]
+        crowed_block = self.boxes[4]
 
         my_counts = 60
         counts = 0
@@ -242,6 +245,7 @@ class crowedSrtategy(Strategy):
                 # 加权求和
                 weight = counts / my_counts
                 time_rate = (1 - weight) * p_rate + weight * time_rate
+                time_rate = time_rate if time_rate > 0.10 else 0.10
 
             counts += 1
 
@@ -262,16 +266,20 @@ class crowedSrtategy(Strategy):
         # [0拥堵概率，1计数器，2这一轮通过数量，3上一轮时间占有率，4这一轮时间占有率]
         p_a_b = p_b_a if p_a_b > 0.1 else 0.1
         self.pool.append([p_a_b, counts, t_counts, p_rate, time_rate])
-        self.lock.release()
 
         print("当前拥堵的概率为：", p_a_b)
 
         # post
-        if p_a_b >= self.threshold:
+        if p_a_b >= self.threshold and not crowed_block[0]:
             self.pbox = t_boxes
             self.draw()
             # push(self.opt, self.im0s, "crowed")
             print("push crowed yes！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！")
+            # block
+            thread_ptz = Thread(target=start_block, args=(crowed_block,), daemon=True)
+            thread_ptz.start()
+        self.lock.release()
+
 
 
 

@@ -22,9 +22,8 @@ from utils.load_streams import LoadStreams
 
 SRC_PATH = os.path.realpath(__file__).rsplit("/", 1)[0]
 
-vfps = 0
-ptz_gate = True
-
+vfps = [0]
+ptz_gate = [True]
 
 # pool
 id_thres = 20
@@ -34,6 +33,9 @@ material_id_pool = []
 illdri_id_pool = []
 crowed_id_pool = []
 lock = threading.Lock()
+
+# block
+crowed_block = [False]
 
 
 def detect(opt):
@@ -64,6 +66,7 @@ def detect(opt):
     global car_id_pool
     global people_id_pool
     global material_id_pool
+    global crowed_block
 
     # 1. 检测区域
     # 2. 异常行驶区域
@@ -99,11 +102,11 @@ def detect(opt):
     tracker = Tracker(metric, max_iou_distance=max_cosine_distance, max_age=MAX_AGE, n_init=N_INIT)
 
     # fps
-    thread_fps = Thread(target=showfps, args=([vfps]), daemon=True)
+    thread_fps = Thread(target=showfps, args=(vfps,), daemon=True)
     thread_fps.start()
 
     # ptz
-    thread_ptz = Thread(target=getStatus, args=([ptz_gate]), daemon=True)
+    thread_ptz = Thread(target=getStatus, args=(ptz_gate[0],), daemon=True)
     thread_ptz.start()
 
     limg = np.random.random([1, 3, MODEL_WIDTH, MODEL_HEIGHT])
@@ -156,21 +159,25 @@ def detect(opt):
             # 2.保留在检测区域内的框或者拥堵区域
             dets = []
             crows = []
+            car_num = 0
             for i, box in enumerate(real_box):
                 center = np.array([(box[0] + box[2]) / 2 * width, (box[1] + box[3]) / 2 * height])
                 if intersects(center, point1):
                     dets.append(box)
                     if intersects(center, point3):
                         crows.append(box)
+                    # 确定检测区域一共有几辆车
+                    car_ids = [0, 1, 13, 14, 16, 17]
+                    if box[4] in car_ids:
+                        car_num += 1
             det = np.array(dets)
-            if len(crows) != 0:
-                crows = np.array(crows)
+            crows = np.array(crows)
+            if len(crows) != 0 and not crowed_block[0]:
                 crows[:, [0, 2]] = (crows[:, [0, 2]] * width).round()
                 crows[:, [1, 3]] = (crows[:, [1, 3]] * height).round()
             print("det_box:", len(det))
             print("crows_box", len(crows))
-
-
+            print("car_num", car_num)
 
             # 开始跟踪的处理-----------------------------------------------------------------------------------------------
             if det is not None and len(det):
@@ -253,13 +260,15 @@ def detect(opt):
                                                                              point2,
                                                                              point3,
                                                                              crows,
-                                                                             p_crowed_time))
+                                                                             p_crowed_time,
+                                                                             crowed_block,
+                                                                             car_num))
                         thread_post.start()
             else:
                 tracker.increment_ages()
 
         # fps-----------------------------------------------------------------------------------------------------------
-        vfps += 1
+        vfps[0] += 1
 
         # show----------------------------------------------------------------------------------------------------------
         if opt.show:

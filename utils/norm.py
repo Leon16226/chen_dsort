@@ -73,8 +73,8 @@ def showfps(vfps):
     #global vfps
     while(True):
         time.sleep(1.0)
-        print("fps:", vfps)
-        vfps = 0
+        print("fps:", vfps[0])
+        vfps[0] = 0
 
 # ptz
 def getStatus(ptz_gate):
@@ -104,3 +104,10 @@ def getStatus(ptz_gate):
         # 比较
 
         time.sleep(1)
+
+
+def start_block(crowed_block):
+    # 5分钟
+    crowed_block[0] = True
+    time.sleep(300)
+    crowed_block[0] = False

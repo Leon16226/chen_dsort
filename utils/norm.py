@@ -79,27 +79,34 @@ def showfps(vfps):
 # ptz
 def getStatus(ptz_gate):
     print("ptz success")
-    #global ptz_gate
 
-    def zeep_pythonvalue(xmlvalue):
+    def zeep_pythonvalue(self, xmlvalue):
         return xmlvalue
 
-    while(True):
+    while True:
         # init
         zeep.xsd.simple.AnySimpleType.pythonvalue = zeep_pythonvalue
-        mycam = ONVIFCamera("192.168.1.89", 80, "admin", "xsy12345")
+        mycam = ONVIFCamera("10.33.27.45", 80, "admin", "admin12345")
         media = mycam.create_media_service()
         # info
         resp = mycam.devicemgmt.GetHostname()
         print('My camera hostname:' + str(resp.Name))
         # ptz service
-        #ptz = mycam.create_ptz_service()
-        #params = ptz.create_type('GetStatus')
+        ptz = mycam.create_ptz_service()
+        params = ptz.create_type('GetStatus')
         # profile
-        #media_profile = media.GetProfiles()[0]
-        #params.ProfileToken = media_profile.token
-        #res = ptz.GetStatus(params)
-        #print(res)
+        media_profile = media.GetProfiles()[0]
+        params.ProfileToken = media_profile.token
+        res = ptz.GetStatus(params)
+        print("ptz")
+        p = res['Position']['PanTilt']['x']
+        t = res['Position']['PanTilt']['y']
+        z = res['Position']['Zoom']['x']
+
+        if p == 0.566611 and t == -0.220222 and z == 0.0:
+            ptz_gate[0] = True
+        else:
+            ptz_gate[0] = False
 
         # 比较
 

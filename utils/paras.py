@@ -3,7 +3,7 @@ from utils.norm import readyaml
 from utils.myjson import read_json
 
 
-def my_parser(area, side, crowed, tcrowed,rtsp, post, point, om, ex, name,
+def my_parser(area, side, crowed, tcrowed, rtsp1, rtsp2, post, point, om, ex, name,
               width, height, const, myclass,
               dist, dconst, overlap, distance, age, ninit, nbudget):
     parser = argparse.ArgumentParser()
@@ -12,7 +12,8 @@ def my_parser(area, side, crowed, tcrowed,rtsp, post, point, om, ex, name,
     parser.add_argument('--side', type=str, default=side)
     parser.add_argument('--crowed', type=str, default=crowed)
     parser.add_argument('--tcrowed', type=str, default=tcrowed)
-    parser.add_argument('--rtsp', type=str, default=rtsp)
+    parser.add_argument('--rtsp1', type=str, default=rtsp1)
+    parser.add_argument('--rtsp2', type=str, default=rtsp2)
     parser.add_argument('--post', type=str, default=post)
     parser.add_argument('--point', type=str, default=point)
     parser.add_argument('--om', type=str, default=om)
@@ -41,7 +42,7 @@ def my_parser(area, side, crowed, tcrowed,rtsp, post, point, om, ex, name,
 def my_yaml():
     y = readyaml()
     opt = my_parser(y['AREA'], y['AREA_SIDE'], y['AREA_CROWED'], y['AREA_CROWED_TIME'],
-                    y['RTSP'], y['POST'], y['POINT'], y['OM'], y['EX'], y['NAME'],
+                    y['RTSP1'], y['RTSP2'], y['POST'], y['POINT'], y['OM'], y['EX'], y['NAME'],
                     y['MODEL_WIDTH'], y['MODEL_HEIGHT'], y['NMS_THRESHOLD_CONST'], y['CLASS_SCORE_CONST'],
                     y['MAX_DIST'], y['MIN_CONFIDENCE'], y['NMS_MAX_OVERLAP'], y['MAX_IOU_DISTANCE'],
                     y['MAX_AGE'], y['N_INIT'], y['NN_BUDGET'])

@@ -22,25 +22,25 @@ from utils.load_streams import LoadStreams
 
 SRC_PATH = os.path.realpath(__file__).rsplit("/", 1)[0]
 
-vfps = [0]
-ptz_gate = [True]
 
-# pool
-id_thres = 20
-car_id_pool = []
-people_id_pool = []
-material_id_pool = []
-illdri_id_pool = []
-crowed_id_pool = []
-lock = threading.Lock()
+def detect(opt, my_rtsp, f_index=0):
+    # 属于方法的局部变量
+    vfps = [0]
+    ptz_gate = [True]
+    crowed_block = [False]
 
-# block
-crowed_block = [False]
+    # pool
+    id_thres = 20
+    car_id_pool = []
+    people_id_pool = []
+    material_id_pool = []
+    illdri_id_pool = []
+    crowed_id_pool = []
+    lock = threading.Lock()
 
-
-def detect(opt):
     # opt
-    rtsp = opt.rtsp
+    # rtsp = opt.rtsp
+    rtsp = my_rtsp
     MODEL_PATH = os.path.join(SRC_PATH, opt.om)
     MODEL_PATH_EX = os.path.join(SRC_PATH, opt.ex)
     print('rtsp:', rtsp)
@@ -60,13 +60,13 @@ def detect(opt):
     N_INIT = opt.ninit
     NN_BUDGET = opt.nbudget
 
-    # global
-    global vfps
-    global ptz_gate
-    global car_id_pool
-    global people_id_pool
-    global material_id_pool
-    global crowed_block
+    # # global
+    # global vfps
+    # global ptz_gate
+    # global car_id_pool
+    # global people_id_pool
+    # global material_id_pool
+    # global crowed_block
 
     # 1. 检测区域
     # 2. 异常行驶区域
@@ -94,7 +94,7 @@ def detect(opt):
     model_extractor = Model(MODEL_PATH_EX)
 
     # Load dataset
-    dataset = LoadStreams(rtsp, img_size=(MODEL_WIDTH, MODEL_HEIGHT))
+    dataset = LoadStreams(rtsp, img_size=(MODEL_WIDTH, MODEL_HEIGHT), index=f_index)
 
     # deepsort init
     max_cosine_distance = MAX_DIST
@@ -106,12 +106,12 @@ def detect(opt):
     thread_fps.start()
 
     # ptz
-    thread_ptz = Thread(target=getStatus, args=(ptz_gate[0],), daemon=True)
-    thread_ptz.start()
+    # thread_ptz = Thread(target=getStatus, args=(ptz_gate[0],), daemon=True)
+    # thread_ptz.start()
 
     limg = np.random.random([1, 3, MODEL_WIDTH, MODEL_HEIGHT])
     # 开始取流检测--------------------------------------------------------------------------------------------------------
-    for i, (path, img, im0s, vid_cap) in enumerate(dataset):
+    for i, (img, im0s) in enumerate(dataset):
 
         # 情况1：重复帧
         if np.sum(limg - img) == 0:
@@ -120,7 +120,7 @@ def detect(opt):
         limg = img
 
         # 情况2：ptz
-        if not ptz_gate:
+        if not ptz_gate[0]:
             print("不在预置位")
             print("xxxxxxxxxxxxxxxxx跳过这帧xxxxxxxxxxxxxxxxx")
             continue
@@ -292,7 +292,10 @@ if __name__ == '__main__':
     else:
         opt = my_yaml()
 
-    detect(opt)
+    rtsp1 = opt.rtsp1
+    rtsp2 = opt.rtsp2
+    detect(opt, rtsp1, 0)
+    detect(opt, rtsp2, 1)
 
 
 

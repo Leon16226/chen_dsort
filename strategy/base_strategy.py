@@ -27,12 +27,10 @@ class Strategy(metaclass=abc.ABCMeta):
         # draw boxes for visualization----------------------------------------------------------------------
         for i, box in enumerate(self.pbox):
             bboxes = box[0:4]
-            id = box[4]
-            cls = box[5]
+            cls = box[4]
+            conf = box[5]
             c = int(cls)
-            # conf = box[6]
 
-            # label = f'{id} {self.labels[c]}{conf:.2f}'
-            label = f'{id} {self.labels[c]}'
+            label = f'{self.labels[c]}{conf:.2f}'
             color = compute_color_for_id(id)
             plot_one_box(bboxes, self.im0s, label=label, color=color, line_thickness=2)

@@ -73,8 +73,11 @@ def showfps(vfps):
     #global vfps
     while(True):
         time.sleep(1.0)
-        print("fps:", vfps[0])
-        vfps[0] = 0
+        for i, fps in enumerate(vfps):
+            print("fps:", i+1, ":", vfps[0])
+            vfps[i] = 0
+
+
 
 # ptz
 def getStatus(ptz_gate):

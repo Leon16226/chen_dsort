@@ -51,14 +51,7 @@ def detect(opt, my_rtsp, f_index=0):
     NMS_THRESHOLD_CONST = opt.const
     CLASS_SCORE_CONST = opt.myclass
     MODEL_OUTPUT_BOXNUM = 10647
-    # deepsort
-    MAX_DIST = opt.dist
-    MIN_CONFIDENCE = opt.dconst
-    NMS_MAX_OVERLAP = opt.overlap
-    MAX_IOU_DISTANCE = opt.distance
-    MAX_AGE = opt.age
-    N_INIT = opt.ninit
-    NN_BUDGET = opt.nbudget
+
 
     # # global
     # global vfps

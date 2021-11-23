@@ -11,33 +11,29 @@ from utils.norm import start_block
 
 
 # 0.异常停车---------------------------------------------------------------------------------------------------------------
-class CarStrategy(Strategy):
+class IiiParkStrategy(Strategy):
 
     def do(self,):
-        for j, box in enumerate(self.boxes):
-            # 初始化参数
-            id = box[4]
+        for box in self.boxes:
+            # init
             bboxes = box[0:4]
 
             # lock
             self.lock.acquire()
             states = 0
             for i, p in enumerate(self.pool[::-1]):
-                if id == p[0] and p[1] < self.threshold:
-                    o = iou(bboxes, p[2:6])
-                    print("当前p时间：", p[6])
+                if p[0] < self.threshold:
+                    o = iou(bboxes, p[1:5])
                     print("iou:", o)
-                    print("thread id:", threading.currentThread().ident)
-                    states = p[1] + 1 if o > 0.95 else p[1]
+                    states = p[0] + 1 if o > 0.95 else p[1]
                     break
-                elif id == p[0] and p[1] >= self.threshold:
+                elif p[0] >= self.threshold:
                     states = self.threshold + 1
                     break
 
-            print("id:", id)
             print("当前状态为：", states)
 
-            self.pool.append([box[4], states, box[0], box[1], box[2], box[3], int(round(time.time() * 1000))])
+            self.pool.append([states, box[0], box[1], box[2], box[3]])
             self.lock.release()
 
             # post

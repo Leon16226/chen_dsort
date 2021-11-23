@@ -1,5 +1,5 @@
 from utils.myjson import read_json
-from area import Area
+from .area import Area
 
 
 class Camera:
@@ -20,7 +20,7 @@ class Camera:
         self.userName = obj['userName']
 
         # 点位配置
-        self.config = obj['configs']['config']
+        self.config = obj['configs']['config'][0]
         self.prestaging = self.config['prestaging']  # 预置位0或1
         self.ptz = (0, 0, 0)
         self.road = self.config['road'][0]
@@ -29,6 +29,14 @@ class Camera:
         for i, info in enumerate(self.road['detectAreas']):
             area = Area(info)
             self.detectAreas.append(area)
+
+    def get_ill_park(self):
+        areas = []
+        for i, area in self.detectAreas:
+            if 'IllegalPark' in area.event_check:
+                areas.append(area.points)
+        return areas
+
 
 
 

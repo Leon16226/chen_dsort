@@ -16,7 +16,7 @@ from deepsort.utils import _preprocess, _xywh_to_xyxy, _xywh_to_tlwh, _tlwh_to_x
 from deepsort.nn_matching import NearestNeighborDistanceMetric
 from deepsort.tracker import Tracker
 from deepsort.detection import Detection
-from utils.paras import my_yaml, my_json
+from utils.paras import my_yaml
 from utils.load_streams import LoadStreams
 from camera.utils import create_cameras
 
@@ -49,6 +49,7 @@ def detect(opt):
     rtsps = [cam.rtsp for cam in cameras]
     MODEL_PATH = os.path.join(SRC_PATH, opt.om)
     MODEL_PATH_EX = os.path.join(SRC_PATH, opt.ex)
+    print('n_cam', n_cam)
     print('rtsp:', rtsps)
     print("om:", MODEL_PATH)
     # others
@@ -75,7 +76,7 @@ def detect(opt):
     model_extractor = Model(MODEL_PATH_EX)
 
     # Load dataset
-    dataset = LoadStreams(rtsps, img_size=(MODEL_WIDTH, MODEL_HEIGHT))
+    dataset = LoadStreams(rtsps, img_size=(MODEL_WIDTH, MODEL_HEIGHT), n_cam=n_cam)
 
     # fps
     thread_fps = Thread(target=showfps, args=(vfps,), daemon=True)
@@ -85,8 +86,8 @@ def detect(opt):
     # thread_ptz = Thread(target=getStatus, args=(ptz_gate[0],), daemon=True)
     # thread_ptz.start()
 
-    # 检测区域
-    ill_park_areas = [cam.get_ill_park()for cam in cameras]
+    # 包括n_cam个相机的检测区域
+    ill_park_areas = [cam.get_ill_park() for cam in cameras]
     areas = [ill_park_areas]
 
     limgs = [np.random.random([1, 3, MODEL_WIDTH, MODEL_HEIGHT])] * n_cam
@@ -97,10 +98,10 @@ def detect(opt):
         if np.sum(limgs[nn] - img) == 0:
             print("xxxxxxxxxxxxxxxxx跳过这帧xxxxxxxxxxxxxxxxx")
             continue
-        limgs = img
+        limgs[nn] = img
 
         # 情况2：ptz
-        if not ptz_gate[0][nn]:
+        if not ptz_gate[nn]:
             print("不在预置位")
             print("xxxxxxxxxxxxxxxxx跳过这帧xxxxxxxxxxxxxxxxx")
             continue
@@ -139,30 +140,32 @@ def detect(opt):
             # draw
             if opt.show:
                 for box in real_box:
-                        bboxes = box[0:4]
-                        cls = box[4]
-                        conf = box[5]
+                    bboxes = box[0:4]
+                    cls = box[4]
+                    conf = box[5]
+                    cls = int(cls)
 
-                        label = f'{labels[cls]}{conf:.2f}'
-                        color = compute_color_for_id(id)
-                        plot_one_box(bboxes, im0s, label=label, color=color, line_thickness=2)
+                    label = f'{labels[cls]}{conf:.2f}'
+                    color = compute_color_for_id(cls)
+                    plot_one_box(bboxes, im0s, label=label, color=color, line_thickness=2)
 
-            # thread--------------------------------------------------------------------------------------------
+            # thread----------------------------------------------------------------------------------------------------
             if len(real_box) > 0:
                 # filter
                 for pool in pools:
                     filter_pool(pool, id_thres)
 
-                # thread
-                thread_post = Thread(target=postprocess_track, args=(opt, im0s, real_box,
+                # 当前nn个相机的thread
+                thread_post = Thread(target=postprocess_track, args=(nn,
+                                                                     opt, im0s, real_box,
                                                                      pools, areas, lock))
                 thread_post.start()
 
-        # fps-----------------------------------------------------------------------------------------------------------
+        # fps
         vfps[nn] += 1
 
         # show----------------------------------------------------------------------------------------------------------
-        if opt.show:
+        if opt.show and nn == 0:
             cv2.imshow("deepsort", im0s)
             if cv2.waitKey(1) == ord('q'):
                 cv2.destroyAllWindows()

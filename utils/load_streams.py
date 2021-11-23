@@ -5,12 +5,13 @@ from threading import Thread
 
 # load rtsp 多路
 class LoadStreams:
-    def __init__(self, sources, img_size=608):
+    def __init__(self, sources, img_size=608, n_cam=0):
         # init
         self.mode = 'images'
         self.img_size = img_size
         self.imgs = [None]
         self.sources = sources
+        self.n_cam = n_cam
 
         # Start
         caps = []
@@ -49,16 +50,16 @@ class LoadStreams:
             ret = cap.grab()
 
         # fps = 25
-        _, self.imgs = cap.retrieve()
+        _, self.imgs = self.caps[n].retrieve()
 
         # judge
         self.index += 1
-        if self.index == 4:
+        if self.index == self.n_cam:
             self.index = 0
 
         self.count += 1
         img0 = self.imgs.copy()
-        print("get a img-------------------------------------------------------------------:")
+        print("get a img-------------------------------------------------------------------:", self.index + 1)
 
         # resize
         img = cv2.resize(img0, self.img_size)

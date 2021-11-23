@@ -32,7 +32,7 @@ class Camera:
 
     def get_ill_park(self):
         areas = []
-        for i, area in self.detectAreas:
+        for area in self.detectAreas:
             if 'IllegalPark' in area.event_check:
                 areas.append(area.points)
         return areas

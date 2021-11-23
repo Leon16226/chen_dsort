@@ -3,7 +3,7 @@ from utils.norm import readyaml
 from utils.myjson import read_json
 
 
-def my_parser(post, point, om, ex, name,
+def my_parser(post, om, ex, name,
               width, height, const, myclass):
     parser = argparse.ArgumentParser()
     # area

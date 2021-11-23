@@ -134,7 +134,6 @@ def _tlwh_to_xyxy(bbox_tlwh, height, width):
         return x1, y1, x2, y2
 
 
-
 def compute_color_for_id(label):
     """
     Simple function that adds fixed color depending on the id

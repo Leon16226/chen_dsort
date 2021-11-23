@@ -70,11 +70,10 @@ def func_nms(boxes, nms_threshold):
 # fps
 def showfps(vfps):
     print("rtsp success")
-    #global vfps
     while(True):
         time.sleep(1.0)
         for i, fps in enumerate(vfps):
-            print("fps:", i+1, ":", vfps[0])
+            print("fps:", i+1, ":", vfps[i])
             vfps[i] = 0
 
 
@@ -121,3 +120,4 @@ def start_block(crowed_block):
     crowed_block[0] = True
     time.sleep(300)
     crowed_block[0] = False
+

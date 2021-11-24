@@ -28,6 +28,7 @@ cameras = create_cameras()
 n_cam = len(cameras)
 
 
+
 def detect(opt):
     # 属于方法的局部变量
     vfps = [0] * n_cam
@@ -57,6 +58,7 @@ def detect(opt):
     MODEL_HEIGHT = opt.height
     NMS_THRESHOLD_CONST = opt.const
     CLASS_SCORE_CONST = opt.myclass
+    points = [opt.p0, opt.p1, opt.p2, opt.p3]  # 代表当前点位需要检测的业务
 
     # Load labels
     names = opt.name
@@ -87,8 +89,13 @@ def detect(opt):
     # thread_ptz.start()
 
     # 包括n_cam个相机的检测区域
+    # 1. 异常停车区域
+    # 2. 行人检测区域
+    # 3. 抛撒物区域
     ill_park_areas = [cam.get_ill_park() for cam in cameras]
-    areas = [ill_park_areas]
+    people_areas = [cam.get_people() for cam in cameras]
+    material_areas = [cam.get_material() for cam in cameras]
+    areas = [ill_park_areas, people_areas, material_areas]
 
     limgs = [np.random.random([1, 3, MODEL_WIDTH, MODEL_HEIGHT])] * n_cam
     # 开始取流检测--------------------------------------------------------------------------------------------------------
@@ -139,8 +146,11 @@ def detect(opt):
 
             # draw
             if opt.show:
+
                 for box in real_box:
                     bboxes = box[0:4]
+                    bboxes[[0, 2]] = (bboxes[[0, 2]] * width).round()
+                    bboxes[[1, 3]] = (bboxes[[1, 3]] * height).round()
                     cls = box[4]
                     conf = box[5]
                     cls = int(cls)
@@ -156,7 +166,7 @@ def detect(opt):
                     filter_pool(pool, id_thres)
 
                 # 当前nn个相机的thread
-                thread_post = Thread(target=postprocess_track, args=(nn,
+                thread_post = Thread(target=postprocess_track, args=(nn, cameras[nn].ip, points,
                                                                      opt, im0s, real_box,
                                                                      pools, areas, lock))
                 thread_post.start()
@@ -165,7 +175,7 @@ def detect(opt):
         vfps[nn] += 1
 
         # show----------------------------------------------------------------------------------------------------------
-        if opt.show and nn == 0:
+        if opt.show and nn == 2:
             cv2.imshow("deepsort", im0s)
             if cv2.waitKey(1) == ord('q'):
                 cv2.destroyAllWindows()

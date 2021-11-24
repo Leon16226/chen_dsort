@@ -1,6 +1,7 @@
 import cv2
 import time
 import numpy as np
+import copy
 from threading import Thread
 
 # load rtsp 多路
@@ -12,6 +13,7 @@ class LoadStreams:
         self.imgs = [None]
         self.sources = sources
         self.n_cam = n_cam
+
 
         # Start
         caps = []
@@ -27,39 +29,43 @@ class LoadStreams:
         self.caps = caps
 
         # read
-        _, self.imgs = self.caps[0].read()
+        self.imgs = []
+        for cap in caps:
+            _, img = cap.read()
+            self.imgs.append(img)
         self.index = 0
+
+        thread = Thread(target=self.update, args=(), daemon=True)
+        thread.start()
+
+    # update
+    def update(self,):
+        print('grabs update')
+        while True:
+            for i, cap in enumerate(self.caps):
+                ret = cap.grab()
+                # 没有帧，则尝试重新连接...
+                while not ret:
+                    print("rtsp重新连接中---------------------------")
+                    time.sleep(1)
+                    cap = cv2.VideoCapture(self.sources[i])
+                    if not cap:
+                        continue
+                    self.caps[i] = cap
+                    ret = cap.grab()
+
+                _, self.imgs[i] = cap.retrieve()
 
     def __iter__(self):
         self.count = -1
         return self
 
     def __next__(self):
-        # 轮相机取流
+        # 轮流取流
         n = self.index
-        ret = self.caps[n].grab()
-
-        # 没有帧，则尝试重新连接...
-        while not ret:
-            print("rtsp重新连接中---------------------------")
-            time.sleep(1)
-            cap = cv2.VideoCapture(self.sources[n])
-            if not cap:
-                continue
-            self.caps[n] = cap
-            ret = cap.grab()
-
-        # fps = 25
-        _, self.imgs = self.caps[n].retrieve()
-
-        # judge
-        self.index += 1
-        if self.index == self.n_cam:
-            self.index = 0
-
         self.count += 1
-        img0 = self.imgs.copy()
-        print("get a img-------------------------------------------------------------------:", self.index + 1)
+        img0 = self.imgs[n].copy()
+        print("get a img-------------------------------------------------------------------:", n)
 
         # resize
         img = cv2.resize(img0, self.img_size)
@@ -69,7 +75,12 @@ class LoadStreams:
         img = img.astype(np.float32)
         img /= 255.0
 
-        return img, img0, self.index - 1
+        # index
+        self.index += 1
+        if self.index == self.n_cam:
+            self.index = 0
+
+        return img, img0, n
 
     def __len__(self):
         return 0

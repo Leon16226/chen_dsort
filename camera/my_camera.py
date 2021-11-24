@@ -37,6 +37,21 @@ class Camera:
                 areas.append(area.points)
         return areas
 
+    def get_people(self):
+        areas = []
+        for area in self.detectAreas:
+            if 'People' in area.event_check:
+                areas.append(area.points)
+        return areas
+
+    def get_material(self):
+        areas = []
+        for area in self.detectAreas:
+            if 'ThrowThings' in area.event_check:
+                areas.append(area.points)
+        return areas
+
+
 
 
 

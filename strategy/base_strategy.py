@@ -3,7 +3,9 @@ from deepsort.utils import compute_color_for_id, plot_one_box
 
 
 class Strategy(metaclass=abc.ABCMeta):
-    def __init__(self, boxes, pool, opt, im0s, threshold, lock):
+    def __init__(self, nn, point, boxes, pool, opt, im0s, threshold, lock):
+        self.nn = nn
+        self.point = point
         self.boxes = boxes
         self.pool = pool
         self.opt = opt
@@ -32,5 +34,5 @@ class Strategy(metaclass=abc.ABCMeta):
             c = int(cls)
 
             label = f'{self.labels[c]}{conf:.2f}'
-            color = compute_color_for_id(id)
+            color = compute_color_for_id(c)
             plot_one_box(bboxes, self.im0s, label=label, color=color, line_thickness=2)

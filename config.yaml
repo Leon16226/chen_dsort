@@ -1,5 +1,5 @@
 # home
-POST: http://192.168.1.30:8080/v1/app/interface/uploadEvent
+POST: http://192.168.1.19:8080/v1/app/interface/uploadEvent
 
 OM: f_weights/highway-sim.om
 EX: f_weights/ckpt.om
@@ -10,3 +10,11 @@ MODEL_HEIGHT: 608
 NMS_THRESHOLD_CONST: 0.65
 CLASS_SCORE_CONST: 0.6
 
+# 0. 异常停车
+# 1. 行人
+# 2. 抛撒物
+# 3. 异常行驶
+p0: '3'
+p1: '2'
+p2: '1'
+p3: '0'

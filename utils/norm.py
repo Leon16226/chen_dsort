@@ -73,7 +73,7 @@ def showfps(vfps):
     while(True):
         time.sleep(1.0)
         for i, fps in enumerate(vfps):
-            print("fps:", i+1, ":", vfps[i])
+            print("fps:", i, ":", vfps[i])
             vfps[i] = 0
 
 

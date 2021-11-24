@@ -4,7 +4,7 @@ import cv2
 from .shape import intersects, poly_area, Cal_area_2poly
 
 
-def postprocess_track(nn,
+def postprocess_track(nn, point, points,
                       opt, im0s, real_box,
                       pools, areas, lock):
 
@@ -12,11 +12,15 @@ def postprocess_track(nn,
 
     # areas
     # 0 : 异常停车
-    a_ill_park = np.array(areas[0][nn])
+    # 1 : 行人
+    a_ill_park = np.array(areas[0][nn]) if str(0) in points[nn] else np.array([])
+    a_people = np.array(areas[1][nn]) if str(1) in points[nn] else np.array([])
+    #a_material = np.array(areas[2][nn])
 
     # test
-    pp = a_ill_park[0].reshape((-1, 1, 2))
-    cv2.polylines(im0s, [pp], True, (211, 0, 148))
+    #if len(a_material) > 0:
+    #    pp = a_material[0].reshape((-1, 1, 2))
+    #    cv2.polylines(im0s, [pp], True, (211, 0, 148))
 
     # 0:car 轿车
     # 1:truck 卡车
@@ -44,8 +48,8 @@ def postprocess_track(nn,
     materials = (2, 3, 4, 5, 6, 7)
 
     my_vehicles = real_box[[v[4] in vehicles for v in real_box]]
-    # my_non_vehicles = real_box[real_box[:, 4] in people_and_novehicles]
-    # my_materials = real_box[real_box[:, 4] in materials]
+    my_people = real_box[[p[4] in people_and_novehicles for p in real_box]]
+    my_materials = real_box[[m[4] in materials for m in real_box]]
 
     # box
     # 0 :  异常停车
@@ -58,6 +62,8 @@ def postprocess_track(nn,
     b_material = []
     b_ill_driving = []
     b_crowed = []
+
+    # vehicles
     for i, ve in enumerate(my_vehicles):
         p = np.array([(ve[2] + ve[0])/2, (ve[3] + ve[1])/2])
         # x个异常停车检测区域
@@ -65,13 +71,34 @@ def postprocess_track(nn,
             if intersects(p, area):
                 b_ill_park.append(ve)
 
-    print('ill_park:', len(b_ill_park))
+    # people
+    for i, pe in enumerate(my_people):
+        p = np.array([(pe[2] + pe[0]) / 2, (pe[3] + pe[1]) / 2])
+        for area in a_people:
+            if intersects(p, area):
+                b_people.append(pe)
+    # 行人还要加车
+    b_people_and_car = []
+    b_people.append(b_people)
+    b_people_and_car.append(my_vehicles)
+
+
+    # materials
+    # for i, ma in enumerate(my_materials):
+    #     p = np.array([(ma[2] + ma[0]) / 2, (ma[3] + ma[1]) / 2])
+    #     for area in a_material:
+    #         if intersects(p, area):
+    #             b_people.append(ma)
+
+    print('rtsp:', nn, 'ill_park:', len(b_ill_park))
+    print('rtsp:', nn, 'people:', len(b_people))
+
 
     c_box = {
              0: np.array(b_ill_park),
-             1: np.array(b_people),
+             1: np.array(b_people_and_car),
              2: np.array(b_material),
              3: np.array(b_ill_driving),
              4: np.array(b_crowed)}
 
-    todo(c_box, pools, opt, im0s, lock)
+    todo(nn, point, c_box, pools, opt, im0s, lock)

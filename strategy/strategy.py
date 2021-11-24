@@ -10,7 +10,7 @@ from utils.shape import poly_area
 from utils.norm import start_block
 
 
-# 0.异常停车---------------------------------------------------------------------------------------------------------------
+# 0.异常停车--------------------------------------------------------------------------------------------------------------
 class IiiParkStrategy(Strategy):
 
     def do(self,):
@@ -22,12 +22,14 @@ class IiiParkStrategy(Strategy):
             self.lock.acquire()
             states = 0
             for i, p in enumerate(self.pool[::-1]):
-                if p[0] < self.threshold:
-                    o = iou(bboxes, p[1:5])
+                o = iou(bboxes, p[1:5])
+                # 是同一辆车，且小于阈值
+                # 怎么判断是偶同一辆车，计算iou重叠度是否
+                if p[0] < self.threshold and o > 0.3:
                     print("iou:", o)
-                    states = p[0] + 1 if o > 0.95 else p[1]
+                    states = p[0] + 1 if o > 0.95 else p[0]
                     break
-                elif p[0] >= self.threshold:
+                elif p[0] >= self.threshold and o > 0.95:
                     states = self.threshold + 1
                     break
 
@@ -40,7 +42,7 @@ class IiiParkStrategy(Strategy):
             if states == self.threshold:
                 self.pbox = [box]
                 self.draw()
-                push(self.opt, self.im0s, "illegalPark")
+                push(self.opt, self.im0s, self.point, "illegalPark")
 
 
 # 1. 行人检测------------------------------------------------------------------------------------------------------------
@@ -48,11 +50,11 @@ class PeopleStrategy(Strategy):
 
     def do(self,):
         # init
-        cars = self.boxes[self.boxes[:, 5] == 0]
-        peoples = self.boxes[self.boxes[:, 5] == 8]
+        peoples = self.boxes[0]
+        cars = self.boxes[1]
         self.boxes = peoples
 
-        if self.boxes.size == 0:
+        if len(peoples) == 0:
             return None
 
         # 加一个空车
@@ -64,51 +66,35 @@ class PeopleStrategy(Strategy):
         print("people ious:", ious)
 
         for j, box in enumerate(self.boxes):
-            # 参数初始化
-            id = box[4]
+            # init
+            bboxes = box[0:4]
 
             # lock
             self.lock.acquire()
             states = 0
-            quadrant = -1
             for i, p in enumerate(self.pool[::-1]):
-                if id == p[0] and p[1] < self.threshold:
+                o = iou(bboxes, p[1:5])
+                if p[0] < self.threshold and o > 0.30:
 
                     pious = ious[j]
                     index = np.argmax(pious)
-                    car = cars[index]
 
                     # 行人格外策略----------------------------------------------------------------------------------------
                     # 1. 人和车重叠iou > 0
                     if pious[index] > 0:
-                        o = np.array([(car[0] + car[2])/2, (car[1] + car[3])/2])
-                        x = np.array([(box[0] + box[2])/2, (box[1] + box[3])/2])
-                        y = x - o
-
-                        # quadrant
-                        # (-1, -1)  (1, -1)
-                        # (-1,  1)  (1,  1)
-                        if y[0] < 0 and y[1] < 0:
-                            quadrant = 0
-                        elif y[0] < 0 and y[1] > 0:
-                            quadrant = 1
-                        elif y[0] > 0 and y[1] > 0:
-                            quadrant = 2
-                        elif y[0] > 0 and y[1] < 0:
-                            quadrant = 3
-
-                        if p[2] != quadrant and quadrant != -1:
-                            states = p[1] + 1
+                        states = 0
                     else:
-                        states = p[1] + 1
+                        states = p[0] + 1 if o > 0.60 else p[0]
                     break
                     # 行人格外策略----------------------------------------------------------------------------------------
-                elif id == p[0] and p[1] >= self.threshold:
+                elif p[0] >= self.threshold and o > 0.60:
                     states = self.threshold + 1
                     break
 
-            self.pool.append([box[4], states, quadrant])
+            self.pool.append([states, box[0], box[1], box[2], box[3]])
             self.lock.release()
+
+            print("当前状态为：", states)
 
             # post
             if states == self.threshold:
@@ -121,23 +107,23 @@ class PeopleStrategy(Strategy):
 class MaterialStrategy(Strategy):
     def do(self):
         for j, box in enumerate(self.boxes):
-            # 初始化参数
-            id = box[4]
+            # init
+            bboxes = box[0:4]
 
             # lock
             self.lock.acquire()
             states = 0
             for i, p in enumerate(self.pool[::-1]):
-                if id == p[0] and p[1] < self.threshold:
+                o = iou(bboxes, p[1:5])
+                if p[0] < self.threshold and o > 0.1:
                     print("抛撒物状态加1")
-                    states = p[1] + 1
+                    states = p[0] + 1
                     break
-                elif id == p[0] and p[1] >= self.threshold:
+                elif p[0] >= self.threshold and o > 0.1:
                     states = self.threshold + 1
                     break
 
-
-            self.pool.append([box[4], states])
+            self.pool.append([states, box[0], box[1], box[2], box[3]])
             self.lock.release()
 
             # post

@@ -7,12 +7,12 @@ import requests
 from .event import Event
 
 
-def push(opt, frame, events):
+def push(opt, frame, point, events):
     print("post a event:" + events)
 
     # opt
     post_url = opt.post
-    ponit_ip = opt.point
+    ponit_ip = point
 
     # event ------------------------------------------------------------------------------------------------------------
     _, bi_frame = cv2.imencode('.jpg', frame)

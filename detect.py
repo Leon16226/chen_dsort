@@ -37,13 +37,13 @@ lock = threading.Lock()
 # block
 crowed_block = [False]
 
-rtsps = ('rtsp://192.168.1.20/yctc1.mp4',
+rtsps = ('rtsp://192.168.1.20/yctc7.mp4',
          'rtsp://192.168.1.20/xr1.mp4',
          'rtsp://192.168.1.20/psw3.mp4',
          'rtsp://192.168.1.20/ycxs1.mp4',
          'rtsp://192.168.1.20/hx3.mp4')
 
-points = ('523,261,768,231,1515,967,586,1009',
+points = ('832,151,901,145,1656,955,169,925',
           '1626,313,1753,327,1716,1002,1009,823',
           '1048,100,1255,100,1202,640,259,570',
           '1108,300,1161,301,1218,1063,961,1068',
@@ -124,8 +124,6 @@ def detect(opt):
         point2 = get_area(false_crowed[0])
         point3 = get_area(crowed[0])
         p_crowed_time = get_area(tcrowed[0])
-
-
 
     # Load labels
     names = opt.name

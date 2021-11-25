@@ -7,8 +7,8 @@ AREA_SIDE: 1125,211,1153,211,1195,995,963,995
 AREA_CROWED: 643,52,663,52,673,155,601,155
 AREA_CROWED_TIME: 637,70,664,70,667,100,624,100
 RTSP: rtsp://192.168.1.20/hx3.mp4
-POST: http://192.168.1.19:8080/v1/app/interface/uploadEvent
-POINT: 192.168.1.16
+POST: http://192.168.1.116:8080/v1/app/interface/uploadEvent
+POINT: 192.168.130.4
 
 JSON_POST: http://10.33.27.45:18080/v1/app/interface/uploadEvent
 

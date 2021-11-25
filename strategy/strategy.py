@@ -25,16 +25,16 @@ class CarStrategy(Strategy):
             for i, p in enumerate(self.pool[::-1]):
                 if id == p[0] and p[1] < self.threshold:
                     o = iou(bboxes, p[2:6])
-                    print("当前p时间：", p[6])
-                    print("iou:", o)
-                    print("thread id:", threading.currentThread().ident)
+                    # print("当前p时间：", p[6])
+                    # print("iou:", o)
+                    # print("thread id:", threading.currentThread().ident)
                     states = p[1] + 1 if o > 0.95 else p[1]
                     break
                 elif id == p[0] and p[1] >= self.threshold:
                     states = self.threshold + 1
                     break
 
-            print("id:", id)
+            # print("id:", id)
             print("当前状态为：", states)
 
             self.pool.append([box[4], states, box[0], box[1], box[2], box[3], int(round(time.time() * 1000))])
@@ -173,7 +173,7 @@ class illegalDriving(Strategy):
                     states = self.threshold + 1
                     break
 
-            print("id:", id)
+            # print("id:", id)
             print("当前状态：", states)
             self.pool.append([box[4], states, points])  # ponits会被程序释放掉
             self.lock.release()
@@ -221,7 +221,7 @@ class crowedSrtategy(Strategy):
         car_track_rate = self.boxes[3]
         crowed_block = self.boxes[4]
 
-        my_counts = 60
+        my_counts = 10
         counts = 0
         t_counts = 0
         time_rate = 0.0
@@ -249,8 +249,8 @@ class crowedSrtategy(Strategy):
 
             counts += 1
 
-        print("%%%%%%%%%%%%%%%%%%% 时间占有率 %%%%%%%%%%%%%%%%%%%%%：", time_rate)
-        print("时间通过数量：", t_counts)
+        # print("%%%%%%%%%%%%%%%%%%% 时间占有率 %%%%%%%%%%%%%%%%%%%%%：", time_rate)
+        # print("时间通过数量：", t_counts)
 
         # Bayes
         if len(self.pool) > 0:
@@ -260,8 +260,8 @@ class crowedSrtategy(Strategy):
         all_event_rate = space_rate * time_rate * car_track_rate
         p_b = f(all_event_rate) * p_crow + w(all_event_rate) * p_no_crow
         p_b_a = f(all_event_rate)
-        print("p(空间占有率x，时间占有率y)", p_b)
-        print("p(空间占有率x，时间占有率|拥堵)", p_b_a)
+        # print("p(空间占有率x，时间占有率y)", p_b)
+        # print("p(空间占有率x，时间占有率|拥堵)", p_b_a)
         p_a_b = p_b_a * p_crow / p_b
         # [0拥堵概率，1计数器，2这一轮通过数量，3上一轮时间占有率，4这一轮时间占有率]
         p_a_b = p_b_a if p_a_b > 0.1 else 0.1
@@ -273,7 +273,7 @@ class crowedSrtategy(Strategy):
         if p_a_b >= self.threshold and not crowed_block[0]:
             self.pbox = t_boxes
             self.draw()
-            # push(self.opt, self.im0s, "crowed")
+            push(self.opt, self.im0s, "crowed")
             print("push crowed yes！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！")
             # block
             thread_ptz = Thread(target=start_block, args=(crowed_block,), daemon=True)

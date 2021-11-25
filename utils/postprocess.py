@@ -22,8 +22,8 @@ def postprocess_track(outputs,
     # cv2.polylines(im0s, [point_s], True, (255, 255, 0))
 
     # 拥堵检测区域 紫色
-    point_c = point3.reshape((-1, 1, 2))
-    cv2.polylines(im0s, [point_c], True, (211, 0, 148))
+    # point_c = point3.reshape((-1, 1, 2))
+    # cv2.polylines(im0s, [point_c], True, (211, 0, 148))
 
     # box : [x1, y1, x2, y2, id, cls]
     in_track_box = np.array(outputs)
@@ -71,9 +71,9 @@ def postprocess_track(outputs,
         p = np.array([(ve[2] + ve[0])/2, (ve[3] + ve[1])/2])
         if intersects(p, point2):
             illdris.append(ve)
-            print("硬路肩有车辆通过")
+            # print("硬路肩有车辆通过")
         elif intersects(p, point3):
-            print("拥堵检测区域有车辆通过")
+            # print("拥堵检测区域有车辆通过")
             crowed.append(ve)
     illdris = np.array(illdris)
     crowed = np.array(crowed)
@@ -97,7 +97,7 @@ def postprocess_track(outputs,
         space_rate = 1.0 * boxs_area / all_area
         space_rate = space_rate if space_rate > 0.10 else 0.10
         space_rate = space_rate if space_rate < 1 else 0.95
-        print("^^^^^^^^^^^^^^^^^ 空间占有率 ^^^^^^^^^^^^^^^^^^：", space_rate)
+        # print("^^^^^^^^^^^^^^^^^ 空间占有率 ^^^^^^^^^^^^^^^^^^：", space_rate)
 
         # 计算车辆跟踪率
         if car_num > 4:
@@ -107,7 +107,7 @@ def postprocess_track(outputs,
             car_track_rate = car_track_rate if car_track_rate < 0.95 else 0.95
         else:
             car_track_rate = 0.10
-        print("^^^^^^^^^^^^^^^^^^ 车辆跟踪率 ^^^^^^^^^^^^^^^^^^:", car_track_rate)
+        # print("^^^^^^^^^^^^^^^^^^ 车辆跟踪率 ^^^^^^^^^^^^^^^^^^:", car_track_rate)
 
         crowed = [crowed, space_rate, t_pass, car_track_rate, crowed_block]
     else:

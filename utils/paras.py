@@ -32,6 +32,8 @@ def my_parser(area, side, crowed, tcrowed,rtsp, post, point, om, ex, name,
     parser.add_argument('--age', type=str, default=age)
     parser.add_argument('--ninit', type=str, default=ninit)
     parser.add_argument('--nbudget', type=str, default=nbudget)
+    # show
+    parser.add_argument('--num', type=int, default=0)
 
     opt = parser.parse_args()
 

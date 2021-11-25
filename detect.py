@@ -37,10 +37,32 @@ lock = threading.Lock()
 # block
 crowed_block = [False]
 
+rtsps = ('rtsp://192.168.1.20/yctc1.mp4',
+         'rtsp://192.168.1.20/xr1.mp4',
+         'rtsp://192.168.1.20/psw3.mp4',
+         'rtsp://192.168.1.20/ycxs1.mp4',
+         'rtsp://192.168.1.20/hx3.mp4')
+
+points = ('523,261,768,231,1515,967,586,1009',
+          '1626,313,1753,327,1716,1002,1009,823',
+          '1048,100,1255,100,1202,640,259,570',
+          '1108,300,1161,301,1218,1063,961,1068',
+          '623,47,706,47,858,198,488,198')
+
+side = ('1125,211,1153,211,1195,995,963,995',)
+crowed = ('643,52,663,52,673,155,601,155',)
+tcrowed = ('637,70,664,70,667,100,624,100',)
+
+false_side = ('0,0,10,0,10,10,0,10',)
+false_crowed = ('0,0,10,0,10,10,0,10',)
+false_tcrowed = ('0,0,10,0,10,10,0,10',)
 
 def detect(opt):
+    # show
+    num = opt.num
+
     # opt
-    rtsp = opt.rtsp
+    rtsp = rtsps[num]
     MODEL_PATH = os.path.join(SRC_PATH, opt.om)
     MODEL_PATH_EX = os.path.join(SRC_PATH, opt.ex)
     print('rtsp:', rtsp)
@@ -71,10 +93,39 @@ def detect(opt):
     # 1. 检测区域
     # 2. 异常行驶区域
     # 3. 缓行区域
-    point1 = get_area(opt.area)
-    point2 = get_area(opt.side)
-    point3 = get_area(opt.crowed)
-    p_crowed_time = get_area(opt.tcrowed)
+
+    # 0: 异常停车
+    # 1：行人
+    # 2：抛撒物
+    # 3：异常行驶 有side
+    # 4：缓行
+    if num == 0:
+        point1 = get_area(points[num])
+        point2 = get_area(false_side[0])
+        point3 = get_area(false_crowed[0])
+        p_crowed_time = get_area(false_tcrowed[0])
+    elif num == 1:
+        point1 = get_area(points[num])
+        point2 = get_area(false_side[0])
+        point3 = get_area(false_crowed[0])
+        p_crowed_time = get_area(false_tcrowed[0])
+    elif num == 2:
+        point1 = get_area(points[num])
+        point2 = get_area(false_side[0])
+        point3 = get_area(false_crowed[0])
+        p_crowed_time = get_area(false_tcrowed[0])
+    elif num == 3:
+        point1 = get_area(points[num])
+        point2 = get_area(side[0])
+        point3 = get_area(false_crowed[0])
+        p_crowed_time = get_area(false_tcrowed[0])
+    elif num == 4:
+        point1 = get_area(points[num])
+        point2 = get_area(false_crowed[0])
+        point3 = get_area(crowed[0])
+        p_crowed_time = get_area(tcrowed[0])
+
+
 
     # Load labels
     names = opt.name
@@ -112,6 +163,8 @@ def detect(opt):
     limg = np.random.random([1, 3, MODEL_WIDTH, MODEL_HEIGHT])
     # 开始取流检测--------------------------------------------------------------------------------------------------------
     for i, (path, img, im0s, vid_cap) in enumerate(dataset):
+
+        s_im0s = im0s.copy()
 
         # 情况1：重复帧
         if np.sum(limg - img) == 0:
@@ -228,7 +281,7 @@ def detect(opt):
                         track_id = track.track_id
                         class_id = track.class_id
                         conf = track.conf
-                        outputs.append(np.array([x1, y1, x2, y2, track_id, class_id, conf], dtype=np.float))
+                        outputs.append(np.array([x1, y1, x2, y2, track_id, class_id, conf], dtype=np.int))
 
                     # draw
                     if opt.show:
@@ -237,11 +290,11 @@ def detect(opt):
                             id = box[4]
                             cls = box[5]
                             c = int(cls)
-                            conf = box[6]
+                            # conf = box[6]
 
-                            label = f'{id} {labels[c]}{conf:.2f}'
+                            label = f'{id} {labels[c]}'
                             color = compute_color_for_id(id)
-                            plot_one_box(bboxes, im0s, label=label, color=color, line_thickness=2)
+                            plot_one_box(bboxes, s_im0s, label=label, color=color, line_thickness=2)
 
                     # thread--------------------------------------------------------------------------------------------
                     if len(outputs) > 0:
@@ -273,9 +326,9 @@ def detect(opt):
         # show----------------------------------------------------------------------------------------------------------
         if opt.show:
             point_s = point1.reshape((-1, 1, 2))
-            cv2.polylines(im0s, [point_s], True, (0, 255, 255))
+            cv2.polylines(s_im0s, [point_s], True, (0, 255, 255))
 
-            cv2.imshow("deepsort", im0s)
+            cv2.imshow("deepsort", s_im0s)
             if cv2.waitKey(1) == ord('q'):
                 cv2.destroyAllWindows()
                 model.destroy()

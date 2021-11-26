@@ -82,7 +82,6 @@ def postprocess_track(nn, point, points,
     b_people.append(b_people)
     b_people_and_car.append(my_vehicles)
 
-
     # materials
     # for i, ma in enumerate(my_materials):
     #     p = np.array([(ma[2] + ma[0]) / 2, (ma[3] + ma[1]) / 2])
@@ -92,7 +91,6 @@ def postprocess_track(nn, point, points,
 
     print('rtsp:', nn, 'ill_park:', len(b_ill_park))
     print('rtsp:', nn, 'people:', len(b_people))
-
 
     c_box = {
              0: np.array(b_ill_park),

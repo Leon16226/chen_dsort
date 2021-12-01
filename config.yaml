@@ -1,5 +1,5 @@
 # home
-POST: http://192.168.1.19:8080/v1/app/interface/uploadEvent
+POST: http://192.168.1.116:8080/v1/app/interface/uploadEvent
 
 OM: f_weights/highway-sim.om
 EX: f_weights/ckpt.om

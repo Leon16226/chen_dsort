@@ -8,7 +8,7 @@ import numpy as np
 from threading import Thread
 from atlas_utils.acl_model import Model
 from atlas_utils.acl_resource import AclResource
-from utils.norm import get_area, load_classes, readyaml, func_nms, showfps, getStatus
+from utils.norm import get_area, load_classes, readyaml, func_nms, showfps, getStatus, detect_post_process
 from utils.postprocess import postprocess_track
 from utils.shape import intersects
 from deepsort.utils import _preprocess, _xywh_to_xyxy, _xywh_to_tlwh, _tlwh_to_xyxy, filter_pool, xyxy2xywh,\
@@ -19,6 +19,7 @@ from deepsort.detection import Detection
 from utils.paras import my_yaml
 from utils.load_streams import LoadStreams
 from camera.utils import create_cameras
+from utils.mydraw import show_boxes_draw
 
 
 SRC_PATH = os.path.realpath(__file__).rsplit("/", 1)[0]
@@ -28,7 +29,6 @@ cameras = create_cameras()
 n_cam = len(cameras)
 
 
-
 def detect(opt):
     # 属于方法的局部变量
     vfps = [0] * n_cam
@@ -36,7 +36,7 @@ def detect(opt):
     crowed_block = [False] * n_cam
 
     # pool
-    id_thres = 20
+    POOL_THRES = 20
     car_id_pool = [[]] * n_cam
     people_id_pool = [[]] * n_cam
     material_id_pool = [[]] * n_cam
@@ -98,8 +98,21 @@ def detect(opt):
     areas = [ill_park_areas, people_areas, material_areas]
 
     limgs = [np.random.random([1, 3, MODEL_WIDTH, MODEL_HEIGHT])] * n_cam
+
+    # 异常停车相似度矩阵
+    # 0：先验停车概率
+    # 1：长宽比
+    # 2：大小
+    # 3：7 xyxy
+    matrix_park = np.zeros((1920, 1080, 7))
+    matrix_park[:, :, 0] = 0.01
+    matrixs_park = [matrix_park] * 4
+    # histogram
+    histograms = [np.zeros((1920, 1080, 265, 1))] * 4
+
     # 开始取流检测--------------------------------------------------------------------------------------------------------
     for i, (img, im0s, nn) in enumerate(dataset):
+        s_im0s = im0s.copy()
 
         # 情况1：重复帧
         if np.sum(limgs[nn] - img) == 0:
@@ -125,64 +138,38 @@ def detect(opt):
                                        infer_output_2,
                                        infer_output[0]), axis=2)
 
-        # 模型输出box的数量
-        MODEL_OUTPUT_BOXNUM = infer_output.shape[1]
-
-        # 转换处理并根据置信度门限过滤box
-        result_box = infer_output[:, :, 0:6].reshape((-1, 6))
-        list_class = infer_output[:, :, 5:5 + nc].reshape((-1, nc))
-        # class
-        list_max = list_class.argmax(axis=1).reshape((MODEL_OUTPUT_BOXNUM, 1))
-        result_box[:, 4] = list_max[:, 0]
-        # conf
-        list_max = list_class.max(axis=1).reshape((MODEL_OUTPUT_BOXNUM, 1))
-        result_box[:, 5] = list_max[:, 0]
-        all_boxes = result_box[result_box[:, 5] >= CLASS_SCORE_CONST]
+        all_boxes = detect_post_process(infer_output, nc, CLASS_SCORE_CONST)
 
         if all_boxes.shape[0] > 0:
-            # 1.根据nms过滤box
+            # nms
             real_box = func_nms(all_boxes, NMS_THRESHOLD_CONST)
             print("real_box:", real_box.shape)
 
             # draw
-            if opt.show:
-
-                for box in real_box:
-                    bboxes = box[0:4]
-                    bboxes[[0, 2]] = (bboxes[[0, 2]] * width).round()
-                    bboxes[[1, 3]] = (bboxes[[1, 3]] * height).round()
-                    cls = box[4]
-                    conf = box[5]
-                    cls = int(cls)
-
-                    label = f'{labels[cls]}{conf:.2f}'
-                    color = compute_color_for_id(cls)
-                    plot_one_box(bboxes, im0s, label=label, color=color, line_thickness=2)
+            if opt.show and nn == 3:
+                show_boxes_draw(real_box, s_im0s, labels, width, height)
+                cv2.imshow('deepsort', s_im0s)
+                if cv2.waitKey(1) == ord('q'):
+                    cv2.destroyAllWindows()
+                    model.destroy()
+                    model_extractor.destroy()
+                    print('quit')
 
             # thread----------------------------------------------------------------------------------------------------
             if len(real_box) > 0:
                 # filter
                 for pool in pools:
-                    filter_pool(pool, id_thres)
+                    filter_pool(pool, POOL_THRES)
 
-                # 当前nn个相机的thread
+                # 第nn个相机的thread
                 thread_post = Thread(target=postprocess_track, args=(nn, cameras[nn].ip, points,
                                                                      opt, im0s, real_box,
-                                                                     pools, areas, lock))
+                                                                     pools, areas, lock,
+                                                                     matrixs_park, histograms))
                 thread_post.start()
 
         # fps
         vfps[nn] += 1
-
-        # show----------------------------------------------------------------------------------------------------------
-        if opt.show and nn == 2:
-            cv2.imshow("deepsort", im0s)
-            if cv2.waitKey(1) == ord('q'):
-                cv2.destroyAllWindows()
-                model.destroy()
-                model_extractor.destroy()
-                print('quit')
-                break
 
 
 if __name__ == '__main__':

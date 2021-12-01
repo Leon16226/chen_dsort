@@ -8,41 +8,90 @@ from net.push import push
 from .base_strategy import Strategy
 from utils.shape import poly_area
 from utils.norm import start_block
+from utils.mystrategy import amend_sim
+from deepsort.utils import calc_iou
 
 
 # 0.异常停车--------------------------------------------------------------------------------------------------------------
 class IiiParkStrategy(Strategy):
 
+    # init
+    def __init__(self, nn, point, boxes, pool, opt, im0s, threshold, lock, matrix_park, histogram):
+        Strategy.__init__(self, nn, point, boxes, pool, opt, im0s, threshold, lock)
+        self.matrix_park = matrix_park
+        self.histogram = histogram
+
     def do(self,):
+
+        updates = []
+
         for box in self.boxes:
             # init
-            bboxes = box[0:4]
+            xyxy1 = box[0:4]
+            cx1, cy1 = (int((box[0] + box[2]) / 2), int((box[1] + box[3]) / 2))
+            h, w = box[3] - box[1], box[2] - box[0]
+            aspect_ratio1 = h / w
+            size1 = h * w
+            # 直方图
+            img = self.im0s[int(box[1]):int(box[3]), int(box[0]):int(box[2])]
+            h1 = cv2.calcHist([img], [1], None, [256], [0, 256])
+            h1 = cv2.normalize(h1, h1, 0, 1, cv2.NORM_MINMAX, -1)
 
-            # lock
+            print('h1', h1.size)
+
             self.lock.acquire()
-            states = 0
-            for i, p in enumerate(self.pool[::-1]):
-                o = iou(bboxes, p[1:5])
-                # 是同一辆车，且小于阈值
-                # 怎么判断是偶同一辆车，计算iou重叠度是否
-                if p[0] < self.threshold and o > 0.3:
-                    print("iou:", o)
-                    states = p[0] + 1 if o > 0.95 else p[0]
-                    break
-                elif p[0] >= self.threshold and o > 0.95:
-                    states = self.threshold + 1
-                    break
+            # 上一帧
+            aspect_ratio2 = self.matrix_park[cx1, cy1, 1]
+            size2 = self.matrix_park[cx1, cy1, 2]
+            xyxy2 = self.matrix_park[cx1, cy1, 3:7]
+            h2 = self.histogram[cx1, cy1]
 
-            print("当前状态为：", states)
+            # 计算
+            sim1 = 1 - np.abs(aspect_ratio2 - aspect_ratio1) / aspect_ratio1
+            sim2 = 1 - np.abs(size2 - size1) / size1
+            sim3 = calc_iou(xyxy2, xyxy1)
+            sim4 = cv2.compareHist(h1, h2, 0)
 
-            self.pool.append([states, box[0], box[1], box[2], box[3]])
-            self.lock.release()
+            # 修正
+            sim1 = amend_sim(sim1)
+            sim2 = amend_sim(sim2)
+            sim3 = amend_sim(sim3)
+            sim4 = sim4
 
-            # post
-            if states == self.threshold:
+            print('hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh', sim3)
+
+            # 同时发生
+            sim = sim1 * sim2 * sim3 * sim4
+            sim = np.power(sim, 1/4)
+
+            # likelihood
+            likelihood1 = np.power(sim, 1/4)
+            likelihood2 = -sim + 1
+
+            # inference
+            prior = self.matrix_park[cx1, cy1, 0]
+            poster = likelihood1 * prior / (likelihood1 * prior + likelihood2 * (1 - prior))
+
+            # behavior
+            if poster > 0.80:
                 self.pbox = [box]
                 self.draw()
                 push(self.opt, self.im0s, self.point, "illegalPark")
+
+            # update
+            updates.append([cx1, cy1, poster, aspect_ratio1, size1, h1])
+
+        # update
+        self.matrix_park = self.matrix_park * 2 / 3
+        for update in updates:
+            cx1 = update[0]
+            cy1 = update[1]
+            self.matrix_park[cx1 - 1:cx1 + 2, cy1 - 1:cy1 + 2, 0] = update[2]
+            self.matrix_park[cx1 - 1:cx1 + 2, cy1 - 1:cy1 + 2, 1] = update[3]
+            self.matrix_park[cx1 - 1:cx1 + 2, cy1 - 1:cy1 + 2, 2] = update[4]
+            self.histogram[cx1 - 1:cx1 + 2, cy1 - 1:cy1 + 2] = update[5]
+
+        self.lock.release()
 
 
 # 1. 行人检测------------------------------------------------------------------------------------------------------------

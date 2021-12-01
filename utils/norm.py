@@ -29,6 +29,25 @@ def readyaml():
     x = yaml.load(cont)
     return x
 
+
+# 检测框后处理
+def detect_post_process(infer_output, nc, CLASS_SCORE_CONST):
+    # 模型输出box的数量
+    MODEL_OUTPUT_BOXNUM = infer_output.shape[1]
+
+    # 转换处理并根据置信度门限过滤box
+    result_box = infer_output[:, :, 0:6].reshape((-1, 6))
+    list_class = infer_output[:, :, 5:5 + nc].reshape((-1, nc))
+    # class
+    list_max = list_class.argmax(axis=1).reshape((MODEL_OUTPUT_BOXNUM, 1))
+    result_box[:, 4] = list_max[:, 0]
+    # conf
+    list_max = list_class.max(axis=1).reshape((MODEL_OUTPUT_BOXNUM, 1))
+    result_box[:, 5] = list_max[:, 0]
+    all_boxes = result_box[result_box[:, 5] >= CLASS_SCORE_CONST]
+
+    return all_boxes
+
 # nms
 def func_nms(boxes, nms_threshold):
     b_x = boxes[:, 0]

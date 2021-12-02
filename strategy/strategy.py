@@ -37,28 +37,38 @@ class IiiParkStrategy(Strategy):
             h1 = cv2.calcHist([img], [1], None, [256], [0, 256])
             h1 = cv2.normalize(h1, h1, 0, 1, cv2.NORM_MINMAX, -1)
 
-            print('h1', h1.size)
-
             self.lock.acquire()
             # 上一帧
             aspect_ratio2 = self.matrix_park[cx1, cy1, 1]
             size2 = self.matrix_park[cx1, cy1, 2]
             xyxy2 = self.matrix_park[cx1, cy1, 3:7]
-            h2 = self.histogram[cx1, cy1]
+            # histogram
+            h2 = 1.0 - h1
+            for item in self.pool:
+                if item[0] == cx1 * 100 + cy1:
+                    h2 = item[1]
+                    break
+
+            #h2 = self.histogram[cx1, cy1]
 
             # 计算
             sim1 = 1 - np.abs(aspect_ratio2 - aspect_ratio1) / aspect_ratio1
             sim2 = 1 - np.abs(size2 - size1) / size1
             sim3 = calc_iou(xyxy2, xyxy1)
+            print('h1', h1.shape)
+            print('h2', h2.shape)
+            #print(h1)
+            #print(h2)
             sim4 = cv2.compareHist(h1, h2, 0)
+            print(sim4)
 
             # 修正
             sim1 = amend_sim(sim1)
             sim2 = amend_sim(sim2)
             sim3 = amend_sim(sim3)
-            sim4 = sim4
+            sim4 = amend_sim(sim4)
 
-            print('hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh', sim3)
+            print('hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh', sim4)
 
             # 同时发生
             sim = sim1 * sim2 * sim3 * sim4
@@ -72,6 +82,8 @@ class IiiParkStrategy(Strategy):
             prior = self.matrix_park[cx1, cy1, 0]
             poster = likelihood1 * prior / (likelihood1 * prior + likelihood2 * (1 - prior))
 
+            print('the rate of illegalPark', poster)
+
             # behavior
             if poster > 0.80:
                 self.pbox = [box]
@@ -79,7 +91,7 @@ class IiiParkStrategy(Strategy):
                 push(self.opt, self.im0s, self.point, "illegalPark")
 
             # update
-            updates.append([cx1, cy1, poster, aspect_ratio1, size1, h1])
+            updates.append([cx1, cy1, poster, aspect_ratio1, size1, box[0], box[1], box[2], box[3], h1])
 
         # update
         self.matrix_park = self.matrix_park * 2 / 3
@@ -89,7 +101,10 @@ class IiiParkStrategy(Strategy):
             self.matrix_park[cx1 - 1:cx1 + 2, cy1 - 1:cy1 + 2, 0] = update[2]
             self.matrix_park[cx1 - 1:cx1 + 2, cy1 - 1:cy1 + 2, 1] = update[3]
             self.matrix_park[cx1 - 1:cx1 + 2, cy1 - 1:cy1 + 2, 2] = update[4]
-            self.histogram[cx1 - 1:cx1 + 2, cy1 - 1:cy1 + 2] = update[5]
+            self.matrix_park[cx1 - 1:cx1 + 2, cy1 - 1:cy1 + 2, 3:7] = update[5:9]
+            # histogram
+            self.pool.append([cx1 * 100 + cy1, update[9].copy()])
+            # self.histogram[cx1 - 1:cx1 + 2, cy1 - 1:cy1 + 2] = update[5]
 
         self.lock.release()
 

@@ -31,8 +31,9 @@ class LoadStreams:
         # read
         self.imgs = []
         for cap in caps:
-            _, img = cap.read()
-            self.imgs.append(img)
+            x, img = cap.read()
+            assert x, 'Failed to read img %s' % source
+            self.imgs.append(img.copy())
         self.index = 0
 
         thread = Thread(target=self.update, args=(), daemon=True)

@@ -108,7 +108,8 @@ def detect(opt):
     matrix_park[:, :, 0] = 0.01
     matrixs_park = [matrix_park] * 4
     # histogram
-    histograms = [np.zeros((1920, 1080, 265, 1))] * 4
+    # histograms = [np.zeros((1920, 1080, 265, 1))] * 4
+    histograms = [np.zeros((5, 5))] * 4
 
     # 开始取流检测--------------------------------------------------------------------------------------------------------
     for i, (img, im0s, nn) in enumerate(dataset):

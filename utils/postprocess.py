@@ -12,10 +12,15 @@ def postprocess_track(nn, point, points,
     # real_box : [x1, y1, x2, y2, cls, conf]
 
     # areas
-    # 0 : 异常停车
-    # 1 : 行人
-    a_ill_park = np.array(areas[0][nn]) if str(0) in points[nn] else np.array([])
-    a_people = np.array(areas[1][nn]) if str(1) in points[nn] else np.array([])
+    # 0. 异常停车
+    # 1. 行人
+    # 2. 抛撒物
+    # 3. 异常行驶
+
+    a_ill_park = np.array(areas['IllegalPark'][nn]) if 'IllegalPark' in points[nn] else np.array([])
+    print('点位：', nn)
+    print('区域：', a_ill_park)
+    #a_people = np.array(areas['People'][nn]) if str(1) in points[nn] else np.array([])
     #a_material = np.array(areas[2][nn])
 
     # test
@@ -72,16 +77,16 @@ def postprocess_track(nn, point, points,
             if intersects(p, area):
                 b_ill_park.append(ve)
 
-    # people
-    for i, pe in enumerate(my_people):
-        p = np.array([(pe[2] + pe[0]) / 2, (pe[3] + pe[1]) / 2])
-        for area in a_people:
-            if intersects(p, area):
-                b_people.append(pe)
-    # 行人还要加车
+    # # people
+    # for i, pe in enumerate(my_people):
+    #     p = np.array([(pe[2] + pe[0]) / 2, (pe[3] + pe[1]) / 2])
+    #     for area in a_people:
+    #         if intersects(p, area):
+    #             b_people.append(pe)
+    # # 行人还要加车
     b_people_and_car = []
-    b_people.append(b_people)
-    b_people_and_car.append(my_vehicles)
+    # b_people.append(b_people)
+    # b_people_and_car.append(my_vehicles)
 
     # materials
     # for i, ma in enumerate(my_materials):

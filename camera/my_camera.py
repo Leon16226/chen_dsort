@@ -5,8 +5,9 @@ from .area import Area
 class Camera:
     def __init__(self, mjson):
         # json
-        self.mjson = mjson
-        obj = read_json(self.mjson)
+
+
+        obj = mjson
 
         # 相机基本信息
         self.ip = obj['ip']

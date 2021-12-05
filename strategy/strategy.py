@@ -22,9 +22,9 @@ class IiiParkStrategy(Strategy):
         self.histogram = histogram
 
     def do(self,):
-
+        print("############################IllegalPark start##################################", self.nn)
+        self.lock.acquire()
         updates = []
-
         for box in self.boxes:
             # init
             xyxy1 = box[0:4]
@@ -37,7 +37,9 @@ class IiiParkStrategy(Strategy):
             h1 = cv2.calcHist([img], [1], None, [256], [0, 256])
             h1 = cv2.normalize(h1, h1, 0, 1, cv2.NORM_MINMAX, -1)
 
-            self.lock.acquire()
+            print('下一个box')
+
+
             # 上一帧
             aspect_ratio2 = self.matrix_park[cx1, cy1, 1]
             size2 = self.matrix_park[cx1, cy1, 2]
@@ -45,8 +47,9 @@ class IiiParkStrategy(Strategy):
             # histogram
             h2 = 1.0 - h1
             for item in self.pool:
-                if item[0] == cx1 * 100 + cy1:
-                    h2 = item[1]
+                #print('item', len(item))
+                if item[0] == cx1 and item[1] == cy1:
+                    h2 = item[2]
                     break
 
             #h2 = self.histogram[cx1, cy1]
@@ -55,28 +58,29 @@ class IiiParkStrategy(Strategy):
             sim1 = 1 - np.abs(aspect_ratio2 - aspect_ratio1) / aspect_ratio1
             sim2 = 1 - np.abs(size2 - size1) / size1
             sim3 = calc_iou(xyxy2, xyxy1)
-            print('h1', h1.shape)
-            print('h2', h2.shape)
-            #print(h1)
-            #print(h2)
             sim4 = cv2.compareHist(h1, h2, 0)
             print(sim4)
 
             # 修正
-            sim1 = amend_sim(sim1)
-            sim2 = amend_sim(sim2)
-            sim3 = amend_sim(sim3)
-            sim4 = amend_sim(sim4)
-
-            print('hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh', sim4)
+            sim1 = amend_sim(sim1)  # 长宽比
+            sim2 = amend_sim(sim2)  # 面积
+            sim3 = amend_sim(sim3)  # iou
+            sim4 = amend_sim(sim4)  # 直方图
+            print('sim1:', sim1)
+            print('sim2:', sim2)
+            print('sim3:', sim3)
+            print('sim4:', sim4)
 
             # 同时发生
             sim = sim1 * sim2 * sim3 * sim4
             sim = np.power(sim, 1/4)
+            print('sim', sim)
 
             # likelihood
-            likelihood1 = np.power(sim, 1/4)
+            likelihood1 = np.power(sim, 1/1.2)
             likelihood2 = -sim + 1
+            print('likelihood1', likelihood1)
+            print('likelihood2', likelihood2)
 
             # inference
             prior = self.matrix_park[cx1, cy1, 0]
@@ -84,17 +88,31 @@ class IiiParkStrategy(Strategy):
 
             print('the rate of illegalPark', poster)
 
+            # 解锁
+            if poster < 0.10:
+                print('解锁')
+                self.matrix_park[cx1 - 3:cx1 + 4, cy1 - 3:cy1 + 4, 7] = 0
+
             # behavior
-            if poster > 0.80:
+            if poster > 0.80 and self.matrix_park[cx1, cy1, 7] == 0:
                 self.pbox = [box]
                 self.draw()
                 push(self.opt, self.im0s, self.point, "illegalPark")
 
+                # 加锁
+                print('加锁')
+                self.matrix_park[cx1 - 3:cx1 + 4, cy1 - 3:cy1 + 4, 7] = 1
+
+
             # update
             updates.append([cx1, cy1, poster, aspect_ratio1, size1, box[0], box[1], box[2], box[3], h1])
 
+        #print('update:', updates[0:9])
+
         # update
-        self.matrix_park = self.matrix_park * 2 / 3
+        self.matrix_park[:, :, 0] = self.matrix_park[:, :, 0] * (2 / 3)
+        # 修正
+        self.matrix_park[:, :, 0] = self.matrix_park[self.matrix_park[:, :, 0] < 0.00001]
         for update in updates:
             cx1 = update[0]
             cy1 = update[1]
@@ -103,10 +121,11 @@ class IiiParkStrategy(Strategy):
             self.matrix_park[cx1 - 1:cx1 + 2, cy1 - 1:cy1 + 2, 2] = update[4]
             self.matrix_park[cx1 - 1:cx1 + 2, cy1 - 1:cy1 + 2, 3:7] = update[5:9]
             # histogram
-            self.pool.append([cx1 * 100 + cy1, update[9].copy()])
+            self.pool.append([cx1, cy1, update[9].copy()])
             # self.histogram[cx1 - 1:cx1 + 2, cy1 - 1:cy1 + 2] = update[5]
 
         self.lock.release()
+        print("#############################IllegalPark end################################", self.nn)
 
 
 # 1. 行人检测------------------------------------------------------------------------------------------------------------

@@ -18,14 +18,15 @@ from deepsort.tracker import Tracker
 from deepsort.detection import Detection
 from utils.paras import my_yaml
 from utils.load_streams import LoadStreams
-from camera.utils import create_cameras
+from camera.utils import create_cameras, create_cameras_online
 from utils.mydraw import show_boxes_draw
 
 
 SRC_PATH = os.path.realpath(__file__).rsplit("/", 1)[0]
 
 # cameras
-cameras = create_cameras()
+# cameras = create_cameras()
+cameras = create_cameras_online('192.168.1.116', '8080', '192.168.1.149')
 n_cam = len(cameras)
 
 
@@ -95,7 +96,9 @@ def detect(opt):
     ill_park_areas = [cam.get_ill_park() for cam in cameras]
     people_areas = [cam.get_people() for cam in cameras]
     material_areas = [cam.get_material() for cam in cameras]
-    areas = [ill_park_areas, people_areas, material_areas]
+    areas = {'IllegalPark': ill_park_areas,
+             'People': people_areas,
+             'ThrowThings': material_areas}
 
     limgs = [np.random.random([1, 3, MODEL_WIDTH, MODEL_HEIGHT])] * n_cam
 
@@ -103,8 +106,9 @@ def detect(opt):
     # 0：先验停车概率
     # 1：长宽比
     # 2：大小
-    # 3：7 xyxy
-    matrix_park = np.zeros((1920, 1080, 7))
+    # 3,4,5,6 xyxy
+    # 7 锁
+    matrix_park = np.zeros((1920, 1080, 8))
     matrix_park[:, :, 0] = 0.01
     matrixs_park = [matrix_park] * 4
     # histogram
@@ -147,7 +151,7 @@ def detect(opt):
             print("real_box:", real_box.shape)
 
             # draw
-            if opt.show and nn == 3:
+            if opt.show and nn == 1:
                 show_boxes_draw(real_box, s_im0s, labels, width, height)
                 cv2.imshow('deepsort', s_im0s)
                 if cv2.waitKey(1) == ord('q'):
@@ -157,7 +161,7 @@ def detect(opt):
                     print('quit')
 
             # thread----------------------------------------------------------------------------------------------------
-            if len(real_box) > 0:
+            if len(real_box) > 0 and nn == 1:
                 # filter
                 for pool in pools:
                     filter_pool(pool, POOL_THRES)

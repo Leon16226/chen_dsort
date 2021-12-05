@@ -6,8 +6,5 @@ def fun1(x):
 
 if __name__ == '__main__':
 
-   s = [np.random.random([5, 1]), 2, 3, 4]
-
-   fun1(s[0])
-
-   print(s)
+   s = 'you are big man'
+   print('man' in s)

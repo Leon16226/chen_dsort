@@ -67,6 +67,7 @@ class LoadStreams:
         self.count += 1
         img0 = self.imgs[n].copy()
         print("get a img-------------------------------------------------------------------:", n)
+        print("source:", self.sources[n])
 
         # resize
         img = cv2.resize(img0, self.img_size)

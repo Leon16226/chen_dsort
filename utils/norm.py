@@ -4,6 +4,7 @@ import time
 from onvif import ONVIFCamera
 import zeep
 
+
 # 获取检测区域
 def get_area(points):
     points = points.split(',')
@@ -86,14 +87,35 @@ def func_nms(boxes, nms_threshold):
     final_boxes = np.array([boxes[i] for i in keep])
     return final_boxes
 
+# control
+class Control:
+    def __init__(self):
+        self.running = True
+
+    def terminate(self):
+        self.running =False
+
+    def control(self, commands):
+        print('control running...')
+        while self.running:
+            time.sleep(1.0)
+
 # fps
-def showfps(vfps):
-    print("rtsp success")
-    while(True):
-        time.sleep(1.0)
-        for i, fps in enumerate(vfps):
-            print("fps:", i, ":", vfps[i])
-            vfps[i] = 0
+class Fps:
+    def __init__(self):
+        self.running = True
+
+    def terminate(self):
+        self.running = False
+
+    def showfps(self, vfps):
+        print("rtsp running...")
+        while self.running:
+            time.sleep(1.0)
+            for i, fps in enumerate(vfps):
+                print("fps:", i, ":", vfps[i])
+                vfps[i] = 0
+        print('fps stop...')
 
 
 

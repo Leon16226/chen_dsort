@@ -7,7 +7,7 @@ from .shape import intersects, poly_area, Cal_area_2poly
 def postprocess_track(nn, point, points,
                       opt, im0s, real_box,
                       pools, areas, lock,
-                      matrixs_park, histograms):
+                      matrixs_park):
 
     # real_box : [x1, y1, x2, y2, cls, conf]
 
@@ -105,4 +105,4 @@ def postprocess_track(nn, point, points,
              3: np.array(b_ill_driving),
              4: np.array(b_crowed)}
 
-    todo(nn, point, c_box, pools, opt, im0s, lock, matrixs_park[nn], histograms[nn])
+    todo(nn, point, c_box, pools, opt, im0s, lock, matrixs_park[nn],)

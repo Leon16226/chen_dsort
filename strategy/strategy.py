@@ -16,10 +16,9 @@ from deepsort.utils import calc_iou
 class IiiParkStrategy(Strategy):
 
     # init
-    def __init__(self, nn, point, boxes, pool, opt, im0s, threshold, lock, matrix_park, histogram):
+    def __init__(self, nn, point, boxes, pool, opt, im0s, threshold, lock, matrix_park,):
         Strategy.__init__(self, nn, point, boxes, pool, opt, im0s, threshold, lock)
         self.matrix_park = matrix_park
-        self.histogram = histogram
 
     def do(self,):
         print("############################IllegalPark start##################################", self.nn)
@@ -112,7 +111,7 @@ class IiiParkStrategy(Strategy):
         # update
         self.matrix_park[:, :, 0] = self.matrix_park[:, :, 0] * (2 / 3)
         # 修正
-        self.matrix_park[:, :, 0] = self.matrix_park[self.matrix_park[:, :, 0] < 0.00001]
+        # self.matrix_park[:, :, 0] = self.matrix_park[self.matrix_park[:, :, 0] < 0.00001]
         for update in updates:
             cx1 = update[0]
             cy1 = update[1]

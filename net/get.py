@@ -9,8 +9,9 @@ from utils.myjson import read_json
 
 
 
-def get_point_json(ip, port, server_ip):
-    url = 'http://' + ip + ':' + port + '/api/v1/app/interface/cameraConfigs'
+def get_point_json(my_url, server_ip):
+    # url = 'http://' + ip + ':' + port + '/api/v1/app/interface/cameraConfigs'
+    url = my_url
     para = {"serverIp": server_ip}
     headers = {}
 

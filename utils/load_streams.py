@@ -4,6 +4,7 @@ import numpy as np
 import copy
 from threading import Thread
 
+
 # load rtsp 多路
 class LoadStreams:
     def __init__(self, sources, img_size=608, n_cam=0):
@@ -86,3 +87,7 @@ class LoadStreams:
 
     def __len__(self):
         return 0
+
+    def terminate(self):
+        self.count = -1
+        print('load stream stop...')

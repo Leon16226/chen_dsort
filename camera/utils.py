@@ -18,9 +18,9 @@ def create_cameras():
     return cameras
 
 
-def create_cameras_online(ip, port, server):
+def create_cameras_online(my_url, server):
     cameras = []
-    myjson = get_point_json(ip, port, server)
+    myjson = get_point_json(my_url, server)
     for i, json in enumerate(myjson):
         cam = Camera(json)
         cameras.append(cam)

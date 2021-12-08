@@ -26,21 +26,28 @@ class My_Socket():
     def terminate(self,):
         self.running = False
 
-    def link_handler(self, link, client, control={}, path={}):
+    def link_handler(self, link, client, control={}, path={}, detect_live=[False], ip_states={}):
 
         print('服务端接受来自[%s:%s]的请求...' % (client[0], client[1]))
 
         while self.running:
             client_date = link.recv(1024).decode('utf-8')
+
+            print('[%s:%s]发来一条消息...' % (client[0], client[1]))
+            if len(client_date) == 0:
+                print('此消息为空，返回...')
+                continue
+
             user_dic = json.loads(client_date)
 
             # method
             method = user_dic['method']
+            requestTimestamp = user_dic['requestTimestamp']
 
             if method == 'control':
-                # 控制检测程序停止或开始
+                # 1. 控制检测程序-----------------------------------------------------------------------------------------
+                print("接收到控制消息...")
                 data = user_dic['data']
-                requestTimestamp = user_dic['requestTimestamp']
                 command = data['command']
 
                 path['eventUploadPath'] = data['eventUploadPath']
@@ -49,32 +56,60 @@ class My_Socket():
                 path['carNoUploadPath'] = data['carNoUploadPath']
 
                 print(command)
-                print(data)
 
-                # 停止检测-----------------------------------------------------------------------------------------------
+                # 停止检测
                 if command == 'stop':
                     control['stop'] = True
 
                 elif command == 'start' or command == 'restart':
                     my_json = my_response(True, '成功', None, requestTimestamp)
                     print(my_json)
-                    link.sendall(my_json.encode())
-                    control['start'] = True
-                    break
-
+                    n = link.sendall(my_json.encode())
+                    if n is None:
+                        print('返回信息成功...')
+                    control['restart'] = True
+                break
             elif method == 'service_status':
-                # 返回检测状态
+                # 2. 返回服务器检测状态-----------------------------------------------------------------------------------------
+                print("接收到服务器检测状态消息...")
+
                 # 0停止，1运行中，2故障
-                pass
+                status = 1 if detect_live[0] else 0
+                data = {
+                    "status": status,
+                    "remark": ""
+                }
+                my_json = my_response(True, '成功', data, requestTimestamp)
+                print(my_json)
+                link.sendall(my_json.encode())
+                break
             elif method == 'camera_status':
-                # 返回点位检测状态
+                # 3. 返回点位检测状态-------------------------------------------------------------------------------------
+                print("接受到点位检测状态消息...")
+
                 # 0未检测，1检测中
-                pass
+                data = user_dic['data']
+                ip = data['ip']
+                if ip in ip_states.keys():
+                    status = 1 if ip_states.get(ip) else 0
+                    remark = ''
+                else:
+                    status = 0
+                    remark = "当前没有检测这个点位..."
+                data = {
+                    "status": status,
+                    "remark": remark,
+                }
+                my_json = my_response(True, '成功', data, requestTimestamp)
+                print(my_json)
+                link.sendall(my_json.encode())
+                break
 
         print('socket close...')
         link.close()
 
-    def create_socket_service(self, ip='192.168.1.149', port=4000, control={}, path={}):
+    def create_socket_service(self, ip='192.168.1.149', port=4000,
+                              control={}, path={}, detect_live=[False], ip_states={}):
 
         ip_port = (ip, port)
         self.sk = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -87,7 +122,8 @@ class My_Socket():
         while self.running:
             print('accepting...')
             conn, address = self.sk.accept()
-            t = threading.Thread(target=self.link_handler, args=(conn, address, control, path))
+
+            t = threading.Thread(target=self.link_handler, args=(conn, address, control, path, detect_live, ip_states))
             t.start()
             self.links.append(conn)
 
@@ -96,9 +132,6 @@ class My_Socket():
     def to_close(self):
         print('关闭所有socket连接...')
         self.sk.close()
-        # for link in self.links:
-        #     link.close()
-
 
 
 

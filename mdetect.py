@@ -31,16 +31,18 @@ PATH = {'eventUploadPath': '',
         'trafficUploadPath': '',
         'configsPath': '',
         'carNoUploadPath': ''}
+DETECT_LIVE = [False]
+IP_STATES = {}
 
 
 class MyDetection(object):
 
-    def __init__(self, states, path):
+    def __init__(self,):
         # socket
-        self.states = states
-        self.path = path
+        self.states = STATES
+        self.path = PATH
 
-        self.detect_live = False
+        self.detect_live = DETECT_LIVE
         self.opt = my_yaml()
 
         # base config
@@ -73,8 +75,6 @@ class MyDetection(object):
         model_path = os.path.join(SRC_PATH, self.opt.om)
         print("om1:", model_path)
         # Load model
-        acl_resource = AclResource()
-        acl_resource.init()
         model = Model(model_path)
 
         # cameras
@@ -83,6 +83,9 @@ class MyDetection(object):
         n_cam = len(cameras)
         print('n_cam', n_cam)
         print('rtsp:', rtsps)
+
+        for cam in cameras:
+            IP_STATES[cam.get_ip()] = True
 
         # 属于方法的局部变量
         vfps = [0] * n_cam
@@ -140,8 +143,10 @@ class MyDetection(object):
         # 开始取流检测--------------------------------------------------------------------------------------------------------
         for i, (img, im0s, nn) in enumerate(self.dataset):
             # 控制
-            if self.states['stop']:
+            if self.states['restart']:
                 print('停止检测...')
+                for cam in cameras:
+                    IP_STATES[cam.get_ip()] = False
                 break
 
             s_im0s = im0s.copy()
@@ -156,6 +161,7 @@ class MyDetection(object):
             if not ptz_gate[nn]:
                 print("不在预置位")
                 print("xxxxxxxxxxxxxxxxx跳过这帧xxxxxxxxxxxxxxxxx")
+                IP_STATES[cameras[nn].get_ip()] = False
                 continue
 
             # 长宽
@@ -201,6 +207,7 @@ class MyDetection(object):
             # fps
             vfps[nn] += 1
 
+        self.set_live(False)
         model.destroy()
 
     def __del__(self):
@@ -215,10 +222,10 @@ class MyDetection(object):
         return self.states
 
     def get_live(self):
-        return self.detect_live
+        return self.detect_live[0]
 
     def set_live(self, live):
-        self.detect_live = live
+        self.detect_live[0] = live
 
 
 # start-----------------------------------------------------------------------------------------------------------------
@@ -226,18 +233,23 @@ def start_socket():
     print('创建detection对象...')
     # 开始socket服务...
     my_socket = My_Socket()
-    thread_socket = Thread(target=my_socket.create_socket_service, args=(LOCAL_IP, 4000, STATES, PATH))
+    thread_socket = Thread(target=my_socket.create_socket_service,
+                           args=(LOCAL_IP, 4000, STATES, PATH, DETECT_LIVE, IP_STATES))
     thread_socket.start()
-    detection = MyDetection(STATES, PATH)
+    detection = MyDetection()
+
+    # acl初始化
+    acl_resource = AclResource()
+    acl_resource.init()
 
     while True:
-        detection = MyDetection(STATES, PATH) if detection is None else detection
+        detection = MyDetection() if detection is None else detection
         time.sleep(1)
         print('等待命令...')
-        if detection.get_states()['start'] and not detection.get_live():
+        if detection.get_states()['restart']:
             print('开始检测....')
             detection.set_live(True)
-            detection.get_states()['start'] = False
+            detection.get_states()['restart'] = False
             detection.detect()
             detection = None
 

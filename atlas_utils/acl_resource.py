@@ -42,6 +42,10 @@ class AclResource(object):
         print("Init resource success")
 
     def __del__(self):
+        # 运行管理资源释放
+        # 依次释放Stream、Context、Device
+        # 最后，acl去初始化
+        print("ACL 资源开始释放...")
         print("acl resource release all resource")
         resource_list.destroy()
         if self.stream:

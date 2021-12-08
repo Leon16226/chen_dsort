@@ -361,6 +361,7 @@ class Model(object):
        
         self._is_destroyed = True
         resource_list.unregister(self)
+        print("模型卸载成功...")
         log_info("Model release source success")
 
     def __del__(self):

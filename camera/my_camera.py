@@ -52,6 +52,9 @@ class Camera:
                 areas.append(area.points)
         return areas
 
+    def get_ip(self):
+        return self.ip
+
 
 
 

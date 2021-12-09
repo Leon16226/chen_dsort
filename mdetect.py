@@ -230,6 +230,10 @@ class MyDetection(object):
 
 # start-----------------------------------------------------------------------------------------------------------------
 def start_socket():
+    # 创建日志文件
+    file = open('roadClose.log', 'w')
+    file.close()
+
     print('创建detection对象...')
     # 开始socket服务...
     my_socket = My_Socket()
@@ -254,5 +258,3 @@ def start_socket():
             detection = None
 
 
-if __name__ == '__main__':
-    start_socket()

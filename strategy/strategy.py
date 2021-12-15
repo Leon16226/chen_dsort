@@ -10,55 +10,59 @@ from utils.shape import poly_area
 from utils.norm import start_block
 from utils.mystrategy import amend_sim
 from deepsort.utils import calc_iou
+from .img_similarity import calculate_hanming, sim_hash
 
+thresholds = [20, 3, 3, 20, 0.8]
 
 # 0.异常停车--------------------------------------------------------------------------------------------------------------
 class IiiParkStrategy(Strategy):
 
     # init
-    def __init__(self, nn, point, boxes, pool, opt, im0s, threshold, lock, matrix_park,):
-        Strategy.__init__(self, nn, point, boxes, pool, opt, im0s, threshold, lock)
+    def __init__(self, url, point, boxes, pool, im0s, labels, height, width, matrix_park,):
+        Strategy.__init__(self, url, point, boxes, pool, im0s, labels, height, width)
         self.matrix_park = matrix_park
 
     def do(self,):
-        print("############################IllegalPark start##################################", self.nn)
+        print("############################IllegalPark start##################################")
         self.lock.acquire()
+
+        # cut down
+        self.matrix_park[:, :, 0] = self.matrix_park[:, :, 0] * (2 / 3)
+
         updates = []
         for box in self.boxes:
-            # init
+            print('next box')
+
+            # 这一帧
             xyxy1 = box[0:4]
-            cx1, cy1 = (int((box[0] + box[2]) / 2), int((box[1] + box[3]) / 2))
-            h, w = box[3] - box[1], box[2] - box[0]
-            aspect_ratio1 = h / w
-            size1 = h * w
+            conf = box[5]
+            cx1, cy1 = (int((box[0] + box[2]) / 2 * 608), int((box[1] + box[3]) / 2 * 608))  # 中心坐标
+            h, w = box[3] - box[1], box[2] - box[0]  # 高、宽
+            aspect_ratio1 = h / w  # 长宽比
+            size1 = h * w  # 面积
             # 直方图
-            img = self.im0s[int(box[1]):int(box[3]), int(box[0]):int(box[2])]
+            img = self.im0s[int(box[1] * self.height):int(box[3] * self.height),
+                            int(box[0] * self.width):int(box[2] * self.width)]
             h1 = cv2.calcHist([img], [1], None, [256], [0, 256])
             h1 = cv2.normalize(h1, h1, 0, 1, cv2.NORM_MINMAX, -1)
-
-            print('下一个box')
-
 
             # 上一帧
             aspect_ratio2 = self.matrix_park[cx1, cy1, 1]
             size2 = self.matrix_park[cx1, cy1, 2]
             xyxy2 = self.matrix_park[cx1, cy1, 3:7]
             # histogram
-            h2 = 1.0 - h1
-            for item in self.pool:
-                #print('item', len(item))
-                if item[0] == cx1 and item[1] == cy1:
-                    h2 = item[2]
-                    break
+            my_key = str(cx1) + str(cy1)
+            if my_key in self.pool.keys():
+                h2 = self.pool[my_key]
+                self.pool.pop(my_key)
+            else:
+                h2 = 1.0 - h1
 
-            #h2 = self.histogram[cx1, cy1]
-
-            # 计算
+            # 计算相似度
             sim1 = 1 - np.abs(aspect_ratio2 - aspect_ratio1) / aspect_ratio1
             sim2 = 1 - np.abs(size2 - size1) / size1
             sim3 = calc_iou(xyxy2, xyxy1)
             sim4 = cv2.compareHist(h1, h2, 0)
-            print(sim4)
 
             # 修正
             sim1 = amend_sim(sim1)  # 长宽比
@@ -70,9 +74,8 @@ class IiiParkStrategy(Strategy):
             print('sim3:', sim3)
             print('sim4:', sim4)
 
-            # 同时发生
-            sim = sim1 * sim2 * sim3 * sim4
-            sim = np.power(sim, 1/4)
+            # 加权平均 * 置信度
+            sim = (sim1 + sim2 + sim3 + sim4) / 4 * conf
             print('sim', sim)
 
             # likelihood
@@ -82,49 +85,49 @@ class IiiParkStrategy(Strategy):
             print('likelihood2', likelihood2)
 
             # inference
-            prior = self.matrix_park[cx1, cy1, 0]
+            prior = self.matrix_park[cx1, cy1, 0] * 1.5
+            prior = prior if prior > 0.0001 else 0.0001
             poster = likelihood1 * prior / (likelihood1 * prior + likelihood2 * (1 - prior))
+            poster = 0.95 if poster > 1 else poster
 
             print('the rate of illegalPark', poster)
 
-            # 解锁
-            if poster < 0.10:
+            circles_lock_w = int(w * 608 * 0.25)
+            circles_lock_h = int(h * 608 * 0.25)
+            lock_area = self.matrix_park[cx1 - circles_lock_w:cx1 + circles_lock_w, cy1 - circles_lock_h:cy1 + circles_lock_h]
+            judge = lock_area > 0.5
+            # 解锁 : 加锁区域内，全部低于某个阈值再解锁
+            if prior < 0.01 and not np.any(judge):
                 print('解锁')
-                self.matrix_park[cx1 - 3:cx1 + 4, cy1 - 3:cy1 + 4, 7] = 0
+                self.matrix_park[cx1 - circles_lock_w:cx1 + circles_lock_w, cy1 - circles_lock_h:cy1 + circles_lock_h, 7] = 0
 
-            # behavior
-            if poster > 0.80 and self.matrix_park[cx1, cy1, 7] == 0:
+            # post
+            if poster > 0.90 and self.matrix_park[cx1, cy1, 7] == 0:
                 self.pbox = [box]
                 self.draw()
-                push(self.opt, self.im0s, self.point, "illegalPark")
+                push(self.url, self.im0s, self.point, "illegalPark")
 
                 # 加锁
                 print('加锁')
-                self.matrix_park[cx1 - 3:cx1 + 4, cy1 - 3:cy1 + 4, 7] = 1
+                self.matrix_park[cx1 - circles_lock_w:cx1 + circles_lock_w, cy1 - circles_lock_h:cy1 + circles_lock_h, 7] = 1
 
-
+            circles = 2
             # update
-            updates.append([cx1, cy1, poster, aspect_ratio1, size1, box[0], box[1], box[2], box[3], h1])
+            boundary_x1 = cx1 - circles if cx1 - circles > 0 else 0
+            boundary_x2 = cx1 + circles if cx1 + circles < 608 else 608
+            boundary_y1 = cy1 - circles if cy1 - circles > 0 else 0
+            boundary_y2 = cy1 + circles if cy1 + circles < 608 else 608
 
-        #print('update:', updates[0:9])
+            self.matrix_park[boundary_x1:boundary_x2, boundary_y1:boundary_y2, 0] = poster
+            self.matrix_park[boundary_x1:boundary_x2, boundary_y1:boundary_y2, 1] = aspect_ratio1
+            self.matrix_park[boundary_x1:boundary_x2, boundary_y1:boundary_y2, 2] = size1
+            self.matrix_park[boundary_x1:boundary_x2, boundary_y1:boundary_y2, 3:7] = xyxy1
 
-        # update
-        self.matrix_park[:, :, 0] = self.matrix_park[:, :, 0] * (2 / 3)
-        # 修正
-        # self.matrix_park[:, :, 0] = self.matrix_park[self.matrix_park[:, :, 0] < 0.00001]
-        for update in updates:
-            cx1 = update[0]
-            cy1 = update[1]
-            self.matrix_park[cx1 - 1:cx1 + 2, cy1 - 1:cy1 + 2, 0] = update[2]
-            self.matrix_park[cx1 - 1:cx1 + 2, cy1 - 1:cy1 + 2, 1] = update[3]
-            self.matrix_park[cx1 - 1:cx1 + 2, cy1 - 1:cy1 + 2, 2] = update[4]
-            self.matrix_park[cx1 - 1:cx1 + 2, cy1 - 1:cy1 + 2, 3:7] = update[5:9]
-            # histogram
-            self.pool.append([cx1, cy1, update[9].copy()])
-            # self.histogram[cx1 - 1:cx1 + 2, cy1 - 1:cy1 + 2] = update[5]
+            my_key = str(cx1) + str(cy1)
+            self.pool[my_key] = h1.copy()
 
         self.lock.release()
-        print("#############################IllegalPark end################################", self.nn)
+        print("#############################IllegalPark end################################")
 
 
 # 1. 行人检测------------------------------------------------------------------------------------------------------------

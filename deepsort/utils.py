@@ -45,7 +45,7 @@ def calc_iou(bbox1, bbox2):
     intersect = h * w
 
     union = area1 + np.squeeze(area2, axis=-1) - intersect
-    return intersect / union
+    return float(intersect / union)
 
 # angle
 def calc_angle(car_c, people_c):

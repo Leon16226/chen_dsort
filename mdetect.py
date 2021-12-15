@@ -4,6 +4,7 @@ import shutil
 import threading
 import time
 import cv2
+import numpy
 import numpy as np
 from threading import Thread
 from atlas_utils.acl_model import Model
@@ -21,18 +22,23 @@ from utils.load_streams import LoadStreams
 from camera.utils import create_cameras, create_cameras_online
 from utils.mydraw import show_boxes_draw
 from mysocket.my_socket import My_Socket
+from strategy.img_similarity import sim_dhash, calculate_hanming
 
 SRC_PATH = os.path.realpath(__file__).rsplit("/", 1)[0]
 LOCAL_IP = '192.168.1.149'
 
 
-STATES = {'stop': False, 'start': False, 'restart': False}
+STATES = {'stop': False, 'start': False, 'restart': False}  # 命令状态
 PATH = {'eventUploadPath': '',
         'trafficUploadPath': '',
         'configsPath': '',
         'carNoUploadPath': ''}
-DETECT_LIVE = [False]
-IP_STATES = {}
+DETECT_LIVE = [False]  # 检测程序状态
+IP_STATES = {}  # 点位检测状态
+
+my_show = True
+my_ptz = False
+my_fps = False
 
 
 class MyDetection(object):
@@ -50,8 +56,6 @@ class MyDetection(object):
         self.model_height = self.opt.height
         self.nms_threshold_const = self.opt.const
         self.class_score_const = self.opt.myclass
-        self.points = [self.opt.p0, self.opt.p1, self.opt.p2, self.opt.p3]
-        self.lock = threading.Lock()
 
         # Load labels
         names = self.opt.name
@@ -61,8 +65,9 @@ class MyDetection(object):
         assert len(self.labels) > 0, "label file load fail"
 
         # opencv
-        cv2.namedWindow("deepsort", 0)
-        cv2.resizeWindow("deepsort", 960, 540)
+        if my_show:
+            cv2.namedWindow("deepsort", 0)
+            cv2.resizeWindow("deepsort", 960, 540)
 
         self.model = None
         self.dataset = None
@@ -71,10 +76,9 @@ class MyDetection(object):
         print('detection 初始化完毕...')
 
     def detect(self,):
-        # init model
+        # load model
         model_path = os.path.join(SRC_PATH, self.opt.om)
         print("om1:", model_path)
-        # Load model
         model = Model(model_path)
 
         # cameras
@@ -87,61 +91,70 @@ class MyDetection(object):
         for cam in cameras:
             IP_STATES[cam.get_ip()] = True
 
+        # 点位检测业务
+        matrix_of_service = np.zeros((n_cam, 5), dtype=numpy.int8)
+        matrix_of_service[1, 0] = 1
+        matrix_of_service[2, 4] = 1
+
         # 属于方法的局部变量
         vfps = [0] * n_cam
         ptz_gate = [True] * n_cam
         crowed_block = [False] * n_cam
 
         # pool
-        POOL_THRES = 20
-        car_id_pool = [[]] * n_cam
-        people_id_pool = [[]] * n_cam
-        material_id_pool = [[]] * n_cam
-        illdri_id_pool = [[]] * n_cam
-        crowed_id_pool = [[]] * n_cam
-        pools = [car_id_pool, people_id_pool, material_id_pool,
-                 illdri_id_pool, crowed_id_pool]
+        dict_strategy = {}
 
         # Load dataset
         self.dataset = LoadStreams(rtsps, img_size=(self.model_width, self.model_height), n_cam=n_cam)
 
         # fps
-        self.myfps = Fps()
-        thread_fps = Thread(target=self.myfps.showfps, args=(vfps,), daemon=True)
-        thread_fps.start()
+        if my_fps:
+            self.myfps = Fps()
+            thread_fps = Thread(target=self.myfps.showfps, args=(vfps,), daemon=True)
+            thread_fps.start()
 
         # ptz
-        # thread_ptz = Thread(target=getStatus, args=(ptz_gate[0],), daemon=True)
-        # thread_ptz.start()
+        if my_ptz:
+            thread_ptz = Thread(target=getStatus, args=(ptz_gate[0],), daemon=True)
+            thread_ptz.start()
 
-        # 包括n_cam个相机的检测区域
+        # 每个点位的检测区域是固定的
         # 1. 异常停车区域
         # 2. 行人检测区域
         # 3. 抛撒物区域
-        ill_park_areas = [cam.get_ill_park() for cam in cameras]
-        people_areas = [cam.get_people() for cam in cameras]
-        material_areas = [cam.get_material() for cam in cameras]
-        areas = {'IllegalPark': ill_park_areas,
-                 'People': people_areas,
-                 'ThrowThings': material_areas}
+        points_detect_areas = []
+        for cam in cameras:
+            point = {}
 
-        limgs = [np.random.random([1, 3, self.model_width, self.model_height])] * n_cam
+            area_of_park = cam.get_ill_park()
+            area_of_people = cam.get_people()
+            area_of_material = cam.get_material()
 
-        # 异常停车相似度矩阵
+            point['IllegalPark'] = area_of_park
+            point['People'] = area_of_people
+            point['ThrowThings'] = area_of_material
+
+            points_detect_areas.append(point)
+
+        hashs = [np.zeros(64, dtype=np.uint8) for n in range(n_cam)]
+
+        # 异常停车状态矩阵 5.64MB
         # 0：先验停车概率
         # 1：长宽比
         # 2：大小
         # 3,4,5,6 xyxy
         # 7 锁
-        matrix_park = np.zeros((1920, 1080, 8))
-        matrix_park[:, :, 0] = 0.01
-        matrixs_park = [matrix_park] * 4
-        # histogram
-        # histograms = [np.zeros((1920, 1080, 265, 1))] * 4
-        # histograms = [np.zeros((5, 5))] * 4
+        matrixs_park = [np.zeros((608, 608, 8), dtype=numpy.float16) if matrix_of_service[n, 0] == 1 else [] for n in range(n_cam)]
+        # 缓行状态矩阵
+        # 0 ：过去30秒此像素点的空间占有率
+        # 1 ：上一轮的空间占有率
+        # 2 ：这一轮的第几帧
+        matrixs_crowd = [np.zeros((608, 608, 2), dtype=numpy.float16) if matrix_of_service[n, 4] == 1 else [] for n in range(n_cam)]
 
-        # 开始取流检测--------------------------------------------------------------------------------------------------------
+        # 开始取流检测----------------------------------------------------------------------------------------------------
         for i, (img, im0s, nn) in enumerate(self.dataset):
+            # img: 4.23 MB
+            # im0s: 24.47 MB
             # 控制
             if self.states['restart']:
                 print('停止检测...')
@@ -149,13 +162,12 @@ class MyDetection(object):
                     IP_STATES[cam.get_ip()] = False
                 break
 
-            s_im0s = im0s.copy()
-
             # 情况1：重复帧
-            if np.sum(limgs[nn] - img) == 0:
+            img_hash = sim_dhash(im0s)
+            if calculate_hanming(hashs[nn], img_hash) == 0:
                 print("xxxxxxxxxxxxxxxxx跳过这帧xxxxxxxxxxxxxxxxx")
                 continue
-            limgs[nn] = img
+            hashs[nn] = img_hash
 
             # 情况2：ptz
             if not ptz_gate[nn]:
@@ -184,8 +196,10 @@ class MyDetection(object):
                 print("real_box:", real_box.shape)
 
                 # draw
-                if self.opt.show and nn == 1:
-                    show_boxes_draw(real_box, s_im0s, self.labels, width, height)
+                s_im0s = None
+                if my_show and nn == 1:
+                    s_im0s = im0s.copy()
+                    show_boxes_draw(real_box.copy(), s_im0s, self.labels, width, height)
                     cv2.imshow('deepsort', s_im0s)
                     if cv2.waitKey(1) == ord('q'):
                         print('停止检测...')
@@ -193,15 +207,19 @@ class MyDetection(object):
 
                 # thread----------------------------------------------------------------------------------------------------
                 if len(real_box) > 0 and nn == 1:
-                    # filter
-                    for pool in pools:
-                        filter_pool(pool, POOL_THRES)
 
                     # 第nn个相机的thread
-                    thread_post = Thread(target=postprocess_track, args=(nn, cameras[nn].ip, self.points,
-                                                                         self.opt, im0s, real_box,
-                                                                         pools, areas, self.lock,
-                                                                         matrixs_park,))
+                    load_url = PATH['eventUploadPath']
+                    ip = cameras[nn].ip
+                    detect_areas = points_detect_areas[nn]
+                    matrix_park = matrixs_park[nn]
+                    matrix_service = matrix_of_service[nn]
+                    thread_post = Thread(target=postprocess_track, args=(load_url, ip, dict_strategy,
+                                                                         height, width, self.labels,
+                                                                         im0s, real_box,
+                                                                         detect_areas,
+                                                                         matrix_park, matrixs_crowd,
+                                                                         matrix_service))
                     thread_post.start()
 
             # fps

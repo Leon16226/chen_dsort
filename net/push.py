@@ -7,11 +7,11 @@ import requests
 from .event import Event
 
 
-def push(opt, frame, point, events):
+def push(url, frame, point, events):
     print("post a event:" + events)
 
     # opt
-    post_url = opt.post
+    post_url = url
     ponit_ip = point
 
     # event ------------------------------------------------------------------------------------------------------------

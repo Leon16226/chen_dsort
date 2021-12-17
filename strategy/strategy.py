@@ -27,7 +27,7 @@ class IiiParkStrategy(Strategy):
         self.lock.acquire()
 
         # cut down
-        self.matrix_park[:, :, 0] = self.matrix_park[:, :, 0] * (2 / 3)
+        self.matrix_park[:, :, 0] = self.matrix_park[:, :, 0] * 0.5
 
         updates = []
         for box in self.boxes:
@@ -85,7 +85,7 @@ class IiiParkStrategy(Strategy):
             print('likelihood2', likelihood2)
 
             # inference
-            prior = self.matrix_park[cx1, cy1, 0] * 1.5
+            prior = self.matrix_park[cx1, cy1, 0] * 2
             prior = prior if prior > 0.0001 else 0.0001
             poster = likelihood1 * prior / (likelihood1 * prior + likelihood2 * (1 - prior))
             poster = 0.95 if poster > 1 else poster
@@ -111,7 +111,7 @@ class IiiParkStrategy(Strategy):
                 print('加锁')
                 self.matrix_park[cx1 - circles_lock_w:cx1 + circles_lock_w, cy1 - circles_lock_h:cy1 + circles_lock_h, 7] = 1
 
-            circles = 2
+            circles = 1
             # update
             boundary_x1 = cx1 - circles if cx1 - circles > 0 else 0
             boundary_x2 = cx1 + circles if cx1 + circles < 608 else 608

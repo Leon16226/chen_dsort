@@ -1,20 +1,27 @@
+import copy
+
 import numpy as np
 from strategy.todo import todo
 import cv2
 from .shape import intersects, poly_area, Cal_area_2poly
-
+from strategy.strategy import IiiParkStrategy
+from strategy.strategy_crowded import CrowedStrategy
 
 index_of_vehicles = (0, 1, 13, 14, 16, 17)
 index_of_people = (8, 10, 12, 15)
 index_of_materials = (2, 3, 4, 5, 6, 7)
 
 
-def postprocess_track(url, point, dict_strategy,
-                      height, width, labels,
-                      im0s, real_box,
-                      point_detect_areas,
-                      matrix_park, matrixs_crowd,
+def postprocess_track(config_camera,
+                      im0s,
+                      dict_strategy,
+                      real_box,
+                      matrix_park,
+                      matrix_crowd,
                       matrix_service):
+
+    # int
+    url, point, height, width, labels, point_detect_areas = config_camera
 
     # real_box : [x1, y1, x2, y2, cls, conf]
     # 此时box是相对坐标
@@ -64,12 +71,14 @@ def postprocess_track(url, point, dict_strategy,
             if matrix_service[0] == 1:
                 for area in area_of_park:
                     if intersects(center, area):
-                        detected_park.append(box)
+                        detected_park.append(box.copy())
+
             # 是否在拥堵检测区域？
-            if matrixs_crowd[4] == 1:
+            if matrix_service[4] == 1:
                 for area in area_of_crowd:
                     if intersects(center, area):
-                        detected_park.append(box)
+                        detected_crowed.append(box.copy())
+
         elif box[4] in index_of_people:
             detected_people.append(box)
         elif box[4] in index_of_materials:
@@ -77,14 +86,11 @@ def postprocess_track(url, point, dict_strategy,
 
     print('rtsp:', 'the number of boxes in ill_park area:', len(detected_park))
     print('rtsp:', 'the number of boxes in people area:', len(detected_people))
+    print('rtsp:', 'the number of boxes in crowed area:', len(detected_crowed))
 
-    boxes_of_different_areas = {
-             0: np.array(detected_park),
-             1: np.array(detected_people),
-             2: np.array(detected_materials),
-             3: np.array(detected_driving),
-             4: np.array(detected_crowed)}
+    boxes_of_different_areas = [np.array(detected_park), np.array(detected_people), np.array(detected_materials),
+                                np.array(detected_driving), np.array(detected_crowed)]
 
     todo(url, point, boxes_of_different_areas, dict_strategy,
          im0s, labels, height, width,
-         matrix_park, matrixs_crowd)
+         matrix_park, matrix_crowd, copy.deepcopy(area_of_crowd))

@@ -15,7 +15,6 @@ class LoadStreams:
         self.sources = sources
         self.n_cam = n_cam
 
-
         # Start
         caps = []
         for source in sources:

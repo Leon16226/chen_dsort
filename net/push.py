@@ -24,8 +24,6 @@ def push(url, frame, point, events):
     # now_date = (datetime.datetime.now() + datetime.timedelta(hours=8)).strftime('%Y-%m-%d %H:%M:%S')
     # now_stamp = int(time.mktime(time.strptime(now_date, '%Y-%m-%d %H:%M:%S'))) * 1000   # 毫秒级时间戳
 
-
-
     event = Event(ponit_ip, int(round(time.time() * 1000)),
                   0, "路段2", events, "",
                   datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 1, [1], 30, img,
@@ -33,7 +31,6 @@ def push(url, frame, point, events):
                   "", "",
                   "1")
     event = json.dumps(event, default=lambda obj: obj.__dict__, sort_keys=True, indent=4)
-
 
     # post -------------------------------------------------------------------------------------------------------------
     url = post_url

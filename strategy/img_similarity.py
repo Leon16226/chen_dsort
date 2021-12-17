@@ -59,6 +59,7 @@ def sim_color_histogram(img):
 
     return hist
 
+
 def calculate_color(hist1, hist2):
 
     if hist2 is None:

@@ -18,12 +18,13 @@ class Strategy(metaclass=abc.ABCMeta):
         self.lock = threading.Lock()
 
     @abc.abstractmethod
-    def do(in_area_box):
+    def do(self):
         pass
 
     # 画标签
     def draw(self):
         # draw boxes for visualization----------------------------------------------------------------------
+        my_im0s = self.im0s.copy()
         for i, box in enumerate(self.pbox):
             bboxes = box[0:4]
             bboxes[[0, 2]] = bboxes[[0, 2]] * self.width
@@ -34,4 +35,4 @@ class Strategy(metaclass=abc.ABCMeta):
 
             label = f'{self.labels[c]}{conf:.2f}'
             color = compute_color_for_id(c)
-            plot_one_box(bboxes, self.im0s, label=label, color=color, line_thickness=2)
+            plot_one_box(bboxes, my_im0s, label=label, color=color, line_thickness=2)

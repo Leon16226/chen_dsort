@@ -1,3 +1,5 @@
+import numpy as np
+
 from utils.myjson import read_json
 from .area import Area
 
@@ -49,6 +51,13 @@ class Camera:
         areas = []
         for area in self.detectAreas:
             if 'ThrowThings' in area.event_check:
+                areas.append(area.points)
+        return areas
+
+    def get_crowed(self):
+        areas = []
+        for area in self.detectAreas:
+            if 'Crowed' in area.event_check:
                 areas.append(area.points)
         return areas
 

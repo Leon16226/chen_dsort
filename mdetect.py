@@ -25,8 +25,8 @@ from mysocket.my_socket import My_Socket
 from strategy.img_similarity import sim_dhash, calculate_hanming
 
 SRC_PATH = os.path.realpath(__file__).rsplit("/", 1)[0]
-LOCAL_IP = '192.168.1.149'
 
+LOCAL_IP = '192.168.1.149'
 
 STATES = {'stop': False, 'start': False, 'restart': False}  # 命令状态
 PATH = {'eventUploadPath': '',
@@ -66,8 +66,8 @@ class MyDetection(object):
 
         # opencv
         if my_show:
-            cv2.namedWindow("deepsort", 0)
-            cv2.resizeWindow("deepsort", 960, 540)
+            cv2.namedWindow("detect", 0)
+            cv2.resizeWindow("detect", 960, 540)
 
         self.model = None
         self.dataset = None
@@ -91,8 +91,8 @@ class MyDetection(object):
         for cam in cameras:
             IP_STATES[cam.get_ip()] = True
 
-        # 点位检测业务
-        matrix_of_service = np.zeros((n_cam, 5), dtype=numpy.int8)
+        # 点位检测业务矩阵
+        matrix_of_service = np.zeros((n_cam, 5), dtype=numpy.uint8)
         matrix_of_service[1, 0] = 1
         matrix_of_service[2, 4] = 1
 
@@ -102,7 +102,7 @@ class MyDetection(object):
         crowed_block = [False] * n_cam
 
         # pool
-        dict_strategy = {}
+        dict_strategy = [{} for n in range(n_cam)]
 
         # Load dataset
         self.dataset = LoadStreams(rtsps, img_size=(self.model_width, self.model_height), n_cam=n_cam)
@@ -129,10 +129,12 @@ class MyDetection(object):
             area_of_park = cam.get_ill_park()
             area_of_people = cam.get_people()
             area_of_material = cam.get_material()
+            area_of_crowed = cam.get_crowed()
 
             point['IllegalPark'] = area_of_park
             point['People'] = area_of_people
             point['ThrowThings'] = area_of_material
+            point['Crowed'] = area_of_crowed
 
             points_detect_areas.append(point)
 
@@ -145,11 +147,10 @@ class MyDetection(object):
         # 3,4,5,6 xyxy
         # 7 锁
         matrixs_park = [np.zeros((608, 608, 8), dtype=numpy.float16) if matrix_of_service[n, 0] == 1 else [] for n in range(n_cam)]
-        # 缓行状态矩阵
-        # 0 ：过去30秒此像素点的空间占有率
-        # 1 ：上一轮的空间占有率
-        # 2 ：这一轮的第几帧
-        matrixs_crowd = [np.zeros((608, 608, 2), dtype=numpy.float16) if matrix_of_service[n, 4] == 1 else [] for n in range(n_cam)]
+        # 缓行状态矩阵    1.05MB
+        # 0 : 这一轮占有次数
+        # 1 ： 上一轮占有次数
+        matrixs_crowd = [np.zeros((608, 608, 2), dtype=numpy.uint8) if matrix_of_service[n, 4] == 1 else [] for n in range(n_cam)]
 
         # 开始取流检测----------------------------------------------------------------------------------------------------
         for i, (img, im0s, nn) in enumerate(self.dataset):
@@ -176,6 +177,9 @@ class MyDetection(object):
                 IP_STATES[cameras[nn].get_ip()] = False
                 continue
 
+            # mask
+            # ???
+
             # 长宽
             height, width = im0s.shape[0], im0s.shape[1]
 
@@ -197,33 +201,41 @@ class MyDetection(object):
 
                 # draw
                 s_im0s = None
-                if my_show and nn == 1:
+                if my_show and nn == 2:
                     s_im0s = im0s.copy()
                     show_boxes_draw(real_box.copy(), s_im0s, self.labels, width, height)
-                    cv2.imshow('deepsort', s_im0s)
+                    cv2.imshow('detect', s_im0s)
                     if cv2.waitKey(1) == ord('q'):
                         print('停止检测...')
                         break
 
                 # thread----------------------------------------------------------------------------------------------------
-                if len(real_box) > 0 and nn == 1:
+                if len(real_box) > 0 and nn == 2:
 
                     # 第nn个相机的thread
                     load_url = PATH['eventUploadPath']
                     ip = cameras[nn].ip
                     detect_areas = points_detect_areas[nn]
+                    my_dict = dict_strategy[nn]
+
                     matrix_park = matrixs_park[nn]
+                    matrix_crowd = matrixs_crowd[nn]
                     matrix_service = matrix_of_service[nn]
-                    thread_post = Thread(target=postprocess_track, args=(load_url, ip, dict_strategy,
-                                                                         height, width, self.labels,
-                                                                         im0s, real_box,
-                                                                         detect_areas,
-                                                                         matrix_park, matrixs_crowd,
+
+                    config_camera = (load_url, ip, height, width, self.labels, detect_areas)
+
+                    thread_post = Thread(target=postprocess_track, args=(config_camera,
+                                                                         im0s,
+                                                                         my_dict,
+                                                                         real_box,
+                                                                         matrix_park,
+                                                                         matrix_crowd,
                                                                          matrix_service))
                     thread_post.start()
 
             # fps
-            vfps[nn] += 1
+            if my_fps:
+                vfps[nn] += 1
 
         self.set_live(False)
         model.destroy()
